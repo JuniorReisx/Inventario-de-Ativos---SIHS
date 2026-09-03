@@ -76,6 +76,7 @@ function withPinnedAtivo (items: AtivoItem[], pinned: AtivoItem | null): AtivoIt
 function AtivosList (props: {
   query: string
   municipality: string | null
+  territory?: string
   loading: boolean
   items: AtivoItem[]
   page: number
@@ -105,16 +106,17 @@ function AtivosList (props: {
     selectedRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [props.selectedKey, props.popup])
 
-  const hasFilter = props.query.length >= 2 || Boolean(props.municipality) || props.items.length > 0
-  let meta = 'Selecione um município, busque um ativo ou clique nele no mapa.'
+  const hasFilter = props.query.length >= 2 || Boolean(props.municipality) || Boolean(props.territory) || props.items.length > 0
+  let meta = 'Selecione um município, um território, busque um ativo ou clique nele no mapa.'
+  const place = props.municipality || props.territory
   if (hasFilter && props.loading) meta = 'Buscando ativos…'
   else if (hasFilter && props.items.length) {
-    meta = props.municipality
-      ? `${rangeStart}–${rangeEnd} de ${props.items.length} em ${props.municipality}`
+    meta = place
+      ? `${rangeStart}–${rangeEnd} de ${props.items.length} em ${place}`
       : `${rangeStart}–${rangeEnd} de ${props.items.length}`
   } else if (hasFilter) {
-    meta = props.municipality
-      ? `Nenhum ativo encontrado em ${props.municipality}`
+    meta = place
+      ? `Nenhum ativo encontrado em ${place}`
       : 'Nenhum ativo encontrado'
   }
 
@@ -191,6 +193,7 @@ function AtivosList (props: {
 function SetoresList (props: {
   query: string
   municipality: string | null
+  territory?: string
   loading: boolean
   items: SetorItem[]
   page: number
@@ -208,16 +211,17 @@ function SetoresList (props: {
   const rangeStart = props.items.length ? start + 1 : 0
   const rangeEnd = Math.min(start + SETOR_PAGE_SIZE, props.items.length)
 
-  const hasFilter = props.query.length >= 2 || Boolean(props.municipality)
-  let meta = 'Selecione um município ou busque um aglomerado.'
+  const hasFilter = props.query.length >= 2 || Boolean(props.municipality) || Boolean(props.territory)
+  let meta = 'Selecione um município, um território ou busque um aglomerado.'
+  const place = props.municipality || props.territory
   if (hasFilter && props.loading) meta = 'Buscando aglomerados…'
   else if (hasFilter && props.items.length) {
-    meta = props.municipality
-      ? `${rangeStart}–${rangeEnd} de ${props.items.length} em ${props.municipality}`
+    meta = place
+      ? `${rangeStart}–${rangeEnd} de ${props.items.length} em ${place}`
       : `${rangeStart}–${rangeEnd} de ${props.items.length}`
   } else if (hasFilter) {
-    meta = props.municipality
-      ? `Nenhum aglomerado encontrado em ${props.municipality}`
+    meta = place
+      ? `Nenhum aglomerado encontrado em ${place}`
       : 'Nenhum aglomerado encontrado'
   }
 
@@ -659,7 +663,7 @@ const Widget = (props: AllWidgetProps<any>) => {
     const webMap = webMapRef.current
     if (!webMap || loading) return
 
-    if (assetSearch.length < 2 && !selectedName) {
+    if (assetSearch.length < 2 && !selectedName && !filterTerritorio) {
       setAtivos(withPinnedAtivo([], pinnedAtivoRef.current))
       setAtivosLoading(false)
       return
@@ -674,6 +678,7 @@ const Widget = (props: AllWidgetProps<any>) => {
           searchText: assetSearch,
           assetType,
           selectedName,
+          territorialScope: Boolean(filterTerritorio),
           territorialWhere: (layer) => layerScopeWhere(layer, {
             selectedName,
             filterTerritorio,
@@ -701,7 +706,7 @@ const Widget = (props: AllWidgetProps<any>) => {
     const webMap = webMapRef.current
     if (!webMap || loading) return
 
-    if (setorSearch.length < 2 && !selectedName) {
+    if (setorSearch.length < 2 && !selectedName && !filterTerritorio) {
       setSetores([])
       setSetoresLoading(false)
       return
@@ -716,6 +721,7 @@ const Widget = (props: AllWidgetProps<any>) => {
           searchText: setorSearch,
           tipo: setorTipo,
           selectedName,
+          territorialScope: Boolean(filterTerritorio),
           territorialWhere: (layer) => layerScopeWhere(layer, {
             selectedName,
             filterTerritorio,
@@ -885,7 +891,7 @@ const Widget = (props: AllWidgetProps<any>) => {
     const requestId = ++popupRequestRef.current
     pinnedAtivoRef.current = null
     restoreAssetTypeFilter()
-    if (assetSearch.length < 2 && !selectedNameRef.current) setAtivos([])
+    if (assetSearch.length < 2 && !selectedNameRef.current && !filterTerritorio) setAtivos([])
     setAssetPopup(null)
     setSelectedAtivoKey(null)
     selectedAtivoKeyRef.current = null
@@ -900,7 +906,7 @@ const Widget = (props: AllWidgetProps<any>) => {
     } finally {
       if (popupRequestRef.current === requestId) setZooming(false)
     }
-  }, [assetSearch, restoreScopeView, restoreAssetTypeFilter])
+  }, [assetSearch, filterTerritorio, restoreScopeView, restoreAssetTypeFilter])
 
   deselectAtivoRef.current = () => { void deselectAtivoKeepScope() }
 
@@ -1651,6 +1657,7 @@ const Widget = (props: AllWidgetProps<any>) => {
                 <SetoresList
                   query={setorSearch}
                   municipality={selectedName}
+                  territory={filterTerritorio}
                   loading={setoresLoading}
                   items={setores}
                   page={page}
@@ -1666,6 +1673,7 @@ const Widget = (props: AllWidgetProps<any>) => {
                 <AtivosList
                   query={assetSearch}
                   municipality={selectedName}
+                  territory={filterTerritorio}
                   loading={ativosLoading}
                   items={ativos}
                   page={page}

@@ -1,13 +1,16 @@
 import { React } from 'jimu-core'
 import { loadArcGISJSAPIModules } from 'jimu-arcgis'
 import {
+  buildMunicipioPopupData,
   createMapView,
   createWebMap,
   disableNativePopup,
   enableMunicipioCustomPopup,
+  highlightWhere,
   resetMunicipioView,
   resizeMapView,
   setupAuthentication,
+  zoomToWhere,
   type MunicipioPopupData
 } from '../../lib/map'
 import {
@@ -15,11 +18,13 @@ import {
   applyAllowedLayers,
   findTotalLayer,
   listSistemasLayers,
+  loadMunicipioSistemaFeature,
   loadTopMunicipiosSistemas,
   normalizeSistemasTypeFilters,
   orderTotalSistemasBreaksAscending,
   popupCountLabel,
   resolveActiveSistemasLayer,
+  searchMunicipiosSistemas,
   selectExclusiveSistemasLayer,
   sistemasLegendLayerInfos,
   type ClassMapConfig,
@@ -55,9 +60,14 @@ function ClassMapPanel (props: {
   const [ranking, setRanking] = useState<MunicipioSistema[]>([])
   const [rankingLayerId, setRankingLayerId] = useState<string | null>(null)
   const [rankingBusy, setRankingBusy] = useState(false)
+  const [munQuery, setMunQuery] = useState('')
+  const [munHits, setMunHits] = useState<MunicipioSistema[]>([])
+  const [munSearchBusy, setMunSearchBusy] = useState(false)
+  const [focusedMun, setFocusedMun] = useState<string | null>(null)
   const rankingLayerIdRef = useRef<string | null>(null)
   const munPopupHandleRef = useRef<{ remove: () => void } | null>(null)
   const munPopupRef = useRef<HTMLDivElement>(null)
+  const rankRef = useRef<HTMLElement>(null)
   const [legendOpen, setLegendOpen] = useState(true)
   const [munPopup, setMunPopup] = useState<{
     open: boolean
@@ -69,6 +79,7 @@ function ClassMapPanel (props: {
 
   const closeMunPopup = useCallback(() => {
     void resetMunicipioView(viewRef.current)
+    setFocusedMun(null)
     setMunPopup({ open: false, data: null })
   }, [])
 
@@ -92,6 +103,74 @@ function ClassMapPanel (props: {
       setRankingBusy(false)
     }
   }
+
+  const focusMunicipio = useCallback(async (name: string) => {
+    const webMap = webMapRef.current
+    const view = viewRef.current
+    const wanted = String(name || '').trim()
+    if (!webMap || !view || !wanted) return
+
+    if (focusedMun && focusedMun.toUpperCase() === wanted.toUpperCase() && munPopup.open) {
+      closeMunPopup()
+      return
+    }
+
+    const hit = await loadMunicipioSistemaFeature(webMap, wanted, props.config, rankingLayerIdRef.current)
+    if (!hit) return
+
+    const oidField = hit.layer?.objectIdField || 'OBJECTID'
+    const oid = hit.feature?.attributes?.[oidField]
+      ?? hit.feature?.attributes?.OBJECTID
+      ?? hit.feature?.attributes?.objectid
+    if (oid != null && Number.isFinite(Number(oid))) {
+      const where = `${oidField} = ${Number(oid)}`
+      void highlightWhere(view, hit.layer, where, { outlineOnly: true })
+      void zoomToWhere(view, hit.layer, where)
+    }
+
+    const rendererField = String(hit.layer?.renderer?.field || '').trim()
+    const data = await buildMunicipioPopupData(hit.layer, hit.feature.attributes, {
+      webMap,
+      compact: true,
+      totalLabel: popupCountLabel(props.config, hit.layer?.title || ''),
+      totalCandidates: [
+        rendererField,
+        ...(props.config.countFields || []),
+        ...(props.config.popupTotalCandidates || [])
+      ]
+    })
+    setFocusedMun(data.nome || wanted)
+    openMunPopup(data)
+  }, [closeMunPopup, focusedMun, munPopup.open, openMunPopup, props.config])
+
+  useEffect(() => {
+    const queryText = munQuery.trim()
+    if (queryText.length < 2) {
+      setMunHits([])
+      setMunSearchBusy(false)
+      return
+    }
+    let cancelled = false
+    setMunSearchBusy(true)
+    const handle = window.setTimeout(() => {
+      void searchMunicipiosSistemas(
+        webMapRef.current,
+        queryText,
+        props.config,
+        rankingLayerIdRef.current
+      ).then((hits) => {
+        if (!cancelled) setMunHits(hits)
+      }).catch(() => {
+        if (!cancelled) setMunHits([])
+      }).finally(() => {
+        if (!cancelled) setMunSearchBusy(false)
+      })
+    }, 280)
+    return () => {
+      cancelled = true
+      window.clearTimeout(handle)
+    }
+  }, [munQuery, rankingLayerId, props.config])
 
   useEffect(() => {
     let cancelled = false
@@ -125,7 +204,10 @@ function ClassMapPanel (props: {
               props.config.allowedLayerKeys
             ),
             countLabel: (layer) => popupCountLabel(props.config, layer?.title || ''),
-            onOpen: openMunPopup,
+            onOpen: (data) => {
+              setFocusedMun(data?.nome || null)
+              openMunPopup(data)
+            },
             onClose: closeMunPopup
           })
         }
@@ -236,6 +318,7 @@ function ClassMapPanel (props: {
       const target = event.target as Node
       if (munPopupRef.current?.contains(target)) return
       if (mapRef.current?.contains(target)) return
+      if (rankRef.current?.contains(target)) return
       closeMunPopup()
     }
 
@@ -247,10 +330,10 @@ function ClassMapPanel (props: {
     }
   }, [munPopup.open, closeMunPopup])
 
-  const maxTotal = ranking[0]?.total || 1
-
   const selectLayer = (layer: SistemaLayerItem) => {
     if (layer.id === rankingLayerIdRef.current && layer.visible) return
+    setMunQuery('')
+    setMunHits([])
     closeMunPopup()
     selectExclusiveSistemasLayer(webMapRef.current, layer.id, props.config.allowedLayerKeys)
     setLayers(listSistemasLayers(webMapRef.current, props.config.allowedLayerKeys))
@@ -258,6 +341,11 @@ function ClassMapPanel (props: {
   }
 
   const rankingLayerTitle = layers.find((item) => item.id === rankingLayerId)?.title
+  const searching = munQuery.trim().length >= 2
+  const listed = searching ? munHits : ranking
+  const listMax = listed[0]?.total || 1
+  const isFocused = (name: string) =>
+    Boolean(focusedMun && name && focusedMun.toUpperCase() === name.toUpperCase())
 
   return (
     <div
@@ -301,45 +389,76 @@ function ClassMapPanel (props: {
       </div>
 
       <div className="infra-sistemas__grid">
-        <article className="infra-sistemas__rank">
+        <article className="infra-sistemas__rank" ref={rankRef}>
           <header>
             <p>Ranking</p>
             <h3>Municípios</h3>
             <small>
-              {rankingBusy
-                ? 'Atualizando ranking…'
-                : rankingLayerTitle
-                  ? layerLabel(rankingLayerTitle)
-                  : ranking.length
-                    ? props.config.rankingSource
-                    : loading ? 'Carregando…' : 'Sem dados'}
+              {searching
+                ? munSearchBusy
+                  ? 'Buscando município…'
+                  : munHits.length
+                    ? `${munHits.length} resultado${munHits.length === 1 ? '' : 's'}`
+                    : 'Nenhum município encontrado'
+                : rankingBusy
+                  ? 'Atualizando ranking…'
+                  : rankingLayerTitle
+                    ? layerLabel(rankingLayerTitle)
+                    : ranking.length
+                      ? props.config.rankingSource
+                      : loading ? 'Carregando…' : 'Sem dados'}
             </small>
+            <label className="infra-sistemas__search">
+              <span className="infra-sistemas__search-icon" aria-hidden="true" />
+              <input
+                type="search"
+                value={munQuery}
+                onChange={(event) => setMunQuery(event.target.value)}
+                placeholder="Pesquisar município…"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label="Pesquisar município"
+              />
+            </label>
           </header>
           <ol>
-            {rankingBusy && !ranking.length
+            {(searching ? munSearchBusy && !munHits.length : rankingBusy && !ranking.length)
               ? (
                 <li className="infra-sistemas__empty">
                   <PortalLoader folderUrl={props.folderUrl} compact />
                 </li>
                 )
-              : ranking.length
-              ? ranking.map((item, index) => (
-                <li key={item.name} className={index < 3 ? `is-top is-top-${index + 1}` : ''}>
-                  <em>{String(index + 1).padStart(2, '0')}</em>
-                  <div>
-                    <strong>{item.name}</strong>
-                    <span className="infra-sistemas__track">
-                      <span style={{ width: `${Math.max(10, (item.total / maxTotal) * 100)}%` }} />
-                    </span>
-                  </div>
-                  <b>{item.total.toLocaleString('pt-BR')}</b>
+              : listed.length
+              ? listed.map((item, index) => (
+                <li
+                  key={item.name}
+                  className={[
+                    index < 3 && !searching ? `is-top is-top-${index + 1}` : '',
+                    isFocused(item.name) ? 'is-selected' : ''
+                  ].filter(Boolean).join(' ')}
+                >
+                  <button
+                    type="button"
+                    onClick={() => { void focusMunicipio(item.name) }}
+                  >
+                    <em>{String(index + 1).padStart(2, '0')}</em>
+                    <div>
+                      <strong>{item.name}</strong>
+                      <span className="infra-sistemas__track">
+                        <span style={{ width: `${Math.max(10, (item.total / Math.max(listMax, 1)) * 100)}%` }} />
+                      </span>
+                    </div>
+                    <b>{item.total.toLocaleString('pt-BR')}</b>
+                  </button>
                 </li>
                 ))
               : (
                 <li className="infra-sistemas__empty">
-                  {loading
+                  {loading || munSearchBusy
                     ? <PortalLoader folderUrl={props.folderUrl} compact />
-                    : props.config.emptyRanking}
+                    : searching
+                      ? 'Nenhum município encontrado.'
+                      : props.config.emptyRanking}
                 </li>
                 )}
           </ol>

@@ -167,12 +167,14 @@ export async function searchAtivos (
     searchText: string
     assetType: AssetType
     selectedName?: string | null
+    territorialScope?: boolean
     territorialWhere: (layer: any) => string
   }
 ): Promise<AtivoItem[]> {
   const queryText = options.searchText.trim()
   const hasSearch = queryText.length >= 2
-  if (!hasSearch && !options.selectedName) return []
+  const hasScope = Boolean(options.selectedName || options.territorialScope)
+  if (!hasSearch && !hasScope) return []
 
   const defs = options.assetType
     ? ASSET_DEFS.filter((def) => def.id === options.assetType)
@@ -194,7 +196,7 @@ export async function searchAtivos (
       const query = layer.createQuery()
       query.where = where
       query.returnGeometry = true
-      query.num = options.selectedName ? 200 : 80
+      query.num = options.selectedName ? 200 : options.territorialScope ? 400 : 80
       query.outFields = [
         layer.objectIdField || 'objectid',
         ...pickExisting(available, [...def.nameFields, ...def.municipalityFields])

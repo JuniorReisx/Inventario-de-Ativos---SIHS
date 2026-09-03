@@ -108,7 +108,7 @@ export const CLASS_MAP_CONFIGS: ClassMapConfig[] = [
     countFields: ['total_poco', 't_poco', 'frequency', 'total'],
     emptyRanking: 'Sem dados de poços.',
     loadingMap: 'Carregando mapa de poços…',
-    allowedLayerKeys: ['total', 'vazao aproveit', 'aproveitavel', 'seco', 'vazao insuficien', 'insuficiente'],
+    allowedLayerKeys: ['total', 'vazao aproveit', 'aproveitavel', 'vazao insuficien', 'insuficiente'],
     popupTotalLabel: 'POÇOS (TOTAL)',
     popupTotalCandidates: [
       'pocos (total)',
@@ -161,8 +161,12 @@ function normalizeLayerTitle (value: string): string {
 const EXCLUDED_LAYER_KEYS = ['lm_estadual', 'lmestadual']
 
 function isExcludedLayerTitle (title: string): boolean {
-  const compact = normalizeLayerTitle(title).replace(/[^a-z0-9]/g, '')
-  return EXCLUDED_LAYER_KEYS.some((key) => compact.includes(key.replace(/[^a-z0-9]/g, '')))
+  const normalized = normalizeLayerTitle(title)
+  const compact = normalized.replace(/[^a-z0-9]/g, '')
+  if (EXCLUDED_LAYER_KEYS.some((key) => compact.includes(key.replace(/[^a-z0-9]/g, '')))) return true
+  if (compact.includes('secouposterior')) return true
+  if (/(^|[^a-z])seco([^a-z]|$)/.test(normalized)) return true
+  return false
 }
 
 function layerIsAllowed (title: string, allowedKeys?: string[]): boolean {
@@ -386,6 +390,97 @@ function pickNameField (layer: any, candidates: string[]): string | null {
 function resolveQueryableLayer (webMap: any, layerId?: string | null): any | null {
   if (!layerId) return null
   return findLayer(webMap, { layerId })
+}
+
+export async function searchMunicipiosSistemas (
+  webMap: any,
+  searchText: string,
+  config?: Pick<ClassMapConfig, 'totalLayerTitles' | 'nameFields' | 'countFields'>,
+  layerId?: string | null,
+  limit = 12
+): Promise<MunicipioSistema[]> {
+  const queryText = searchText.trim()
+  if (queryText.length < 2) return []
+
+  const titles = config?.totalLayerTitles || [SISTEMAS_TOTAL_LAYER]
+  const nameFields = config?.nameFields || ['municipio']
+  const countFields = config?.countFields || ['frequency']
+  const layer = layerId
+    ? resolveQueryableLayer(webMap, layerId)
+    : findTotalLayer(webMap, titles, countFields)
+  if (!layer || typeof layer.queryFeatures !== 'function') return []
+
+  await layer.load?.()
+  const nameField = pickNameField(layer, nameFields)
+  const countField = pickCountField(layer, countFields)
+  if (!nameField) return []
+
+  const like = `'%${escapeSqlLiteral(queryText).replace(/%/g, '\\%').replace(/_/g, '\\_').toUpperCase()}%'`
+  const inherited = String(layer?.definitionExpression || '').trim()
+  const typeWhere = inherited
+    ? normalizeTipoDefinitionExpression(inherited)
+    : tipoWhereFromTitle(layer?.title || '')
+  const query = layer.createQuery()
+  query.where = sqlAnd(typeWhere, `UPPER(${nameField}) LIKE ${like}`)
+  query.returnGeometry = false
+  query.num = limit
+  query.outFields = [nameField, ...(countField ? [countField] : [])]
+  if (countField) query.orderByFields = [`${countField} DESC`]
+
+  try {
+    const result = await layer.queryFeatures(query)
+    return (result.features || [])
+      .map((feature: any) => {
+        const attrs = feature.attributes || {}
+        return {
+          name: String(attrs[nameField] || '').trim() || '—',
+          total: Number(attrs[countField || ''] ?? 0)
+        }
+      })
+      .filter((item: MunicipioSistema) => item.name !== '—')
+  } catch (err) {
+    console.error('[infra-sistemas] Falha ao buscar município:', err)
+    return []
+  }
+}
+
+export async function loadMunicipioSistemaFeature (
+  webMap: any,
+  name: string,
+  config?: Pick<ClassMapConfig, 'totalLayerTitles' | 'nameFields' | 'countFields'>,
+  layerId?: string | null
+): Promise<{ layer: any, feature: any } | null> {
+  const wanted = String(name || '').trim()
+  if (!wanted) return null
+  const titles = config?.totalLayerTitles || [SISTEMAS_TOTAL_LAYER]
+  const nameFields = config?.nameFields || ['municipio']
+  const countFields = config?.countFields || ['frequency']
+  const layer = layerId
+    ? resolveQueryableLayer(webMap, layerId)
+    : findTotalLayer(webMap, titles, countFields)
+  if (!layer || typeof layer.queryFeatures !== 'function') return null
+
+  await layer.load?.()
+  const nameField = pickNameField(layer, nameFields)
+  if (!nameField) return null
+
+  const query = layer.createQuery()
+  query.where = sqlAnd(
+    layer.definitionExpression,
+    `UPPER(${nameField}) = UPPER('${escapeSqlLiteral(wanted)}')`
+  )
+  query.returnGeometry = true
+  query.num = 1
+  query.outFields = ['*']
+
+  try {
+    const result = await layer.queryFeatures(query)
+    const feature = result?.features?.[0]
+    return feature ? { layer, feature } : null
+  } catch (err) {
+    console.error('[infra-sistemas] Falha ao localizar município:', err)
+    return null
+  }
 }
 
 export async function loadTopMunicipiosSistemas (

@@ -47,9 +47,7 @@ export const SANEAMENTO_NOTES = {
     title: 'Como funcionam os indicadores',
     body: [
       'Fonte: Tabela 6805 (SIDRA / IBGE 2022) — Domicílios particulares permanentes ocupados, por tipo de esgotamento sanitário.',
-      'Diferente do abastecimento de água, aqui não há o cruzamento entre “ter ligação” e “forma principal”. A tabela classifica cada domicílio diretamente pelo tipo de esgotamento sanitário utilizado.',
-      'As categorias seguem o SIDRA, como: rede geral ou pluvial; fossa séptica ligada ou não à rede; fossa rudimentar ou buraco; vala; e demais formas previstas na tabela.',
-      'Neste painel, o destaque usa o nome SIDRA “Rede geral, rede pluvial ou fossa ligada à rede”. As barras mostram também fossa séptica ou fossa filtro não ligada à rede e fossa rudimentar ou buraco. “Não tinham banheiro nem sanitário” aparece só no indicador. Os valores acompanham o filtro ativo (estado, território, município ou semiárido).',
+      'O destaque “Rede geral, rede pluvial ou fossa ligada à rede” é a soma dos dois campos do web map. O gráfico de barras mostra como esse total se divide: “Rede geral ou pluvial” e “Fossa séptica ou fossa filtro ligada à rede” (100% = o destaque). O segundo indicador é “Não tinham banheiro nem sanitário” (SIDRA).',
       'O selo Embasa indica municípios atendidos pela Embasa em esgotamento. No recorte de um município, o selo mostra “Atendido” ou “Não atendido”. No território (ou outro recorte), clique no selo para ver a lista dos municípios atendidos.'
     ]
   }
@@ -59,10 +57,10 @@ const AA_HIGHLIGHT_LABEL = 'Possui ligação à rede geral'
 const AA_SECONDARY_LABEL = 'Não possui ligação à rede geral'
 const AA_USA_REDE_LABEL = 'Possui ligação à rede geral e a utiliza como forma principal'
 const AA_NAO_USA_REDE_LABEL = 'Possui ligação à rede geral, mas utiliza principalmente outra forma'
-const ESG_REDE_LABEL = 'Rede geral, rede pluvial ou fossa ligada à rede'
-const ESG_FOSSA_LABEL = 'Fossa séptica ou fossa filtro não ligada à rede'
-const ESG_RUD_LABEL = 'Fossa rudimentar ou buraco'
-const ESG_SEM_LABEL = 'Não tinham banheiro nem sanitário'
+const ESG_HIGHLIGHT_LABEL = 'Rede geral, rede pluvial ou fossa ligada à rede'
+const ESG_SECONDARY_LABEL = 'Não tinham banheiro nem sanitário'
+const ESG_USA_REDE_LABEL = 'Rede geral ou pluvial'
+const ESG_NAO_USA_REDE_LABEL = 'Fossa séptica ou fossa filtro ligada à rede'
 
 const AA_COLORS = {
   rede: '#071C33',
@@ -82,6 +80,55 @@ function n (value: any): number | null {
   if (value == null || value === '') return null
   const num = Number(value)
   return Number.isFinite(num) ? num : null
+}
+
+function fieldMatchesNeedle (fieldName: string, needle: string): boolean {
+  const compact = (value: string) => String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+  const a = compact(fieldName)
+  const b = compact(needle)
+  if (!a || !b) return false
+  if (a === b) return true
+  const shorter = a.length <= b.length ? a : b
+  const longer = a.length <= b.length ? b : a
+  return shorter.length >= 20 && longer.startsWith(shorter)
+}
+
+function pickLayerFieldByTokens (
+  available: Map<string, string>,
+  required: string[],
+  forbidden: string[] = []
+): string | null {
+  const compact = (value: string) => String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+  const need = required.map(compact).filter(Boolean)
+  const skip = forbidden.map(compact).filter(Boolean)
+  for (const [lower, name] of available) {
+    const key = compact(lower)
+    if (skip.some((item) => key.includes(item))) continue
+    if (need.every((item) => key.includes(item))) return name
+  }
+  return null
+}
+
+function numFromKeyPattern (
+  attrs: Record<string, any>,
+  includes: string[],
+  excludes: string[] = []
+): number | null {
+  for (const [key, value] of Object.entries(attrs || {})) {
+    if (excludes.some((item) => fieldMatchesNeedle(key, item))) continue
+    if (!includes.some((item) => fieldMatchesNeedle(key, item))) continue
+    const parsed = n(value)
+    if (parsed != null) return parsed
+  }
+  return null
 }
 
 const DPA_EMBASA_AGUA_FIELD = 'abastecimento_agua'
@@ -320,7 +367,48 @@ function resolveShareTotal (declared: number | null, parts: number, values: Arra
   return parts
 }
 
-/** SIDRA 6803: possui ligação = soma das categorias com ligação (principal + outra forma). */
+function esgotoLigacaoFromAttrs (attrs: Record<string, any>): {
+  usaPrincipal: number | null
+  naoUsaPrincipal: number | null
+  totalDom: number | null
+  semBanheiro: number | null
+} {
+  return {
+    usaPrincipal: n(attrs.esg_rede_geral_ou_pluvia)
+      ?? n(attrs.esg_rede_geral_ou_pluvial)
+      ?? n(attrs.e_rede_pluvial)
+      ?? n(attrs.rede_geral_ou_pluvial)
+      ?? n(attrs.rede_geral_ou_pluvia)
+      ?? numFromKeyPattern(attrs, ['esg_rede_geral_ou_pluvia', 'esg_rede_geral_ou_pluvial']),
+    naoUsaPrincipal: n(attrs.esg_fossa_septica_ou_fossa_filtro_ligada_a_rede)
+      ?? n(attrs.e_fossa_ligada)
+      ?? n(attrs.fossa_septica_ou_fossa_filtro_ligada_a_rede)
+      ?? numFromKeyPattern(attrs, ['esg_fossa_septica_ou_fossa_filtro_ligada', 'fossa_filtro_ligada'], ['nao_ligada']),
+    totalDom: n(attrs.esg_total) ?? n(attrs.e_tot),
+    semBanheiro: n(attrs.sem_banheiro)
+      ?? n(attrs.esg_n_t_bs)
+      ?? n(attrs.e_sem)
+      ?? n(attrs.esg_ntbs)
+      ?? numFromKeyPattern(attrs, ['esg_n_t_bs', 'sem_banheiro', 'nao_tinham_banheiro'])
+  }
+}
+
+function buildEsgotoSplit (
+  usaPrincipal: number | null,
+  naoUsaPrincipal: number | null,
+  totalDom: number | null,
+  fallbackRede: number | null = null
+) {
+  const hasNewFields = usaPrincipal != null || naoUsaPrincipal != null
+  const usa = hasNewFields ? (usaPrincipal || 0) : (fallbackRede || 0)
+  const outra = hasNewFields ? (naoUsaPrincipal || 0) : 0
+  return splitAguaLigacao({
+    totalDom,
+    semLigacao: null,
+    usaComoPrincipal: usa,
+    outrasFormas: outra
+  })
+}
 function splitAguaLigacao (options: {
   totalDom: number | null
   semLigacao: number | null
@@ -333,13 +421,17 @@ function splitAguaLigacao (options: {
   naoUsaPrincipal: number
   sem: number
 } {
-  const sem = Math.max(0, options.semLigacao || 0)
   const usaPrincipal = Math.max(0, options.usaComoPrincipal || 0)
   const naoUsaPrincipal = Math.max(0, options.outrasFormas)
   const possuiLigacao = usaPrincipal + naoUsaPrincipal
-  const partsTotal = possuiLigacao + sem
   const declared = options.totalDom
-  const total = declared != null && declared > partsTotal ? declared : partsTotal
+  const hasSem = options.semLigacao != null
+  const semGiven = Math.max(0, options.semLigacao || 0)
+  const partsTotal = possuiLigacao + (hasSem ? semGiven : 0)
+  const total = declared != null && declared > partsTotal
+    ? declared
+    : (hasSem ? partsTotal : Math.max(declared || 0, possuiLigacao))
+  const sem = hasSem ? semGiven : Math.max(0, total - possuiLigacao)
   return { total, possuiLigacao, usaPrincipal, naoUsaPrincipal, sem }
 }
 
@@ -356,18 +448,17 @@ function emptySummary (
         { id: 'nao-usa-rede', label: AA_NAO_USA_REDE_LABEL, value: null, percent: null, color: AA_COLORS.poco }
       ]
     : [
-        { id: 'rede', label: ESG_REDE_LABEL, value: null, percent: null, color: ESG_COLORS.rede },
-        { id: 'fossa', label: ESG_FOSSA_LABEL, value: null, percent: null, color: ESG_COLORS.fossa },
-        { id: 'rud', label: ESG_RUD_LABEL, value: null, percent: null, color: ESG_COLORS.rudimentar }
+        { id: 'usa-rede', label: ESG_USA_REDE_LABEL, value: null, percent: null, color: ESG_COLORS.rede },
+        { id: 'nao-usa-rede', label: ESG_NAO_USA_REDE_LABEL, value: null, percent: null, color: ESG_COLORS.fossa }
       ]
 
   return {
     title: isAgua ? 'Abastecimento de Água' : 'Esgotamento Sanitário',
     scopeLabel,
-    highlightLabel: isAgua ? AA_HIGHLIGHT_LABEL : ESG_REDE_LABEL,
+    highlightLabel: isAgua ? AA_HIGHLIGHT_LABEL : ESG_HIGHLIGHT_LABEL,
     highlightValue: null,
     highlightPercent: null,
-    secondaryLabel: isAgua ? AA_SECONDARY_LABEL : ESG_SEM_LABEL,
+    secondaryLabel: isAgua ? AA_SECONDARY_LABEL : ESG_SECONDARY_LABEL,
     secondaryValue: null,
     secondaryPercent: null,
     embasaLabel: isAgua
@@ -432,32 +523,42 @@ function buildAguaFromBahia (attrs: Record<string, any>, scopeLabel: string): Sa
 }
 
 function buildEsgotoFromBahia (attrs: Record<string, any>, scopeLabel: string): SaneamentoSummary {
-  const rede = n(attrs.rede_esgoto)
-  const fossa = n(attrs.fossa_septica)
-  const rud = n(attrs.fossa_rudimentar)
-  const sem = n(attrs.sem_banheiro)
-  const outros =
-    (n(attrs.vala) || 0) +
-    (n(attrs.rio_lago_mar) || 0) +
-    (n(attrs.outra_forma) || 0)
-  const total =
-    (rede || 0) + (fossa || 0) + (rud || 0) + outros + (sem || 0)
+  const ligacao = esgotoLigacaoFromAttrs(attrs)
+  const split = buildEsgotoSplit(
+    ligacao.usaPrincipal,
+    ligacao.naoUsaPrincipal,
+    ligacao.totalDom,
+    n(attrs.rede_esgoto) ?? n(attrs.esg_rrpflg)
+  )
+  const semBanheiro = ligacao.semBanheiro
+  const baseTotal = split.total || ligacao.totalDom
 
   return {
     title: 'Esgotamento Sanitário',
     scopeLabel,
-    highlightLabel: ESG_REDE_LABEL,
-    highlightValue: rede,
-    highlightPercent: n(attrs.rede_esgoto_perc) ?? pct(rede, total),
-    secondaryLabel: ESG_SEM_LABEL,
-    secondaryValue: sem,
-    secondaryPercent: n(attrs.sem_banheiro_perc) ?? pct(sem, total),
+    highlightLabel: ESG_HIGHLIGHT_LABEL,
+    highlightValue: split.possuiLigacao,
+    highlightPercent: pct(split.possuiLigacao, split.total),
+    secondaryLabel: ESG_SECONDARY_LABEL,
+    secondaryValue: semBanheiro,
+    secondaryPercent: pct(semBanheiro, baseTotal),
     embasaLabel: 'Mun. atendidos Embasa (esgoto)',
     embasaValue: n(attrs.mun_at_embasa_e),
     metrics: [
-      { id: 'rede', label: ESG_REDE_LABEL, value: rede, percent: n(attrs.rede_esgoto_perc) ?? pct(rede, total), color: ESG_COLORS.rede },
-      { id: 'fossa', label: ESG_FOSSA_LABEL, value: fossa, percent: n(attrs.fossa_septica_perc) ?? pct(fossa, total), color: ESG_COLORS.fossa },
-      { id: 'rud', label: ESG_RUD_LABEL, value: rud, percent: n(attrs.fossa_rudimentar_perc) ?? pct(rud, total), color: ESG_COLORS.rudimentar }
+      {
+        id: 'usa-rede',
+        label: ESG_USA_REDE_LABEL,
+        value: split.usaPrincipal,
+        percent: pct(split.usaPrincipal, split.possuiLigacao),
+        color: ESG_COLORS.rede
+      },
+      {
+        id: 'nao-usa-rede',
+        label: ESG_NAO_USA_REDE_LABEL,
+        value: split.naoUsaPrincipal,
+        percent: pct(split.naoUsaPrincipal, split.possuiLigacao),
+        color: ESG_COLORS.fossa
+      }
     ],
     status: 'ok',
     source: SANEAMENTO_SOURCE
@@ -531,14 +632,14 @@ function buildEsgotoFromMunStats (
   scopeLabel: string,
   filterType: DashboardFilter['type']
 ): SaneamentoSummary {
-  const rede = n(stats.e_rede)
-  const fossa = n(stats.e_fossasr)
-  const rud = n(stats.e_fossab)
-  const sem = n(stats.e_sem)
-  const outros = (n(stats.e_vala) || 0) + (n(stats.e_rio) || 0) + (n(stats.e_outra) || 0)
-  const parts = (rede || 0) + (fossa || 0) + (rud || 0) + outros + (sem || 0)
-  const declared = n(stats.e_tot)
-  const total = resolveShareTotal(declared, parts, [rede, fossa, rud, outros || null, sem])
+  const split = buildEsgotoSplit(
+    n(stats.e_rede_pluvial),
+    n(stats.e_fossa_ligada),
+    n(stats.e_tot),
+    n(stats.e_rede)
+  )
+  const semBanheiro = n(stats.e_sem)
+  const baseTotal = n(stats.e_tot) || split.total
   const embasaCount = n(stats.embasa_e)
   const isMunicipio = filterType === 'municipio'
   const served = (embasaCount || 0) > 0
@@ -551,19 +652,30 @@ function buildEsgotoFromMunStats (
   return {
     title: 'Esgotamento Sanitário',
     scopeLabel,
-    highlightLabel: ESG_REDE_LABEL,
-    highlightValue: rede,
-    highlightPercent: pct(rede, total),
-    secondaryLabel: ESG_SEM_LABEL,
-    secondaryValue: sem,
-    secondaryPercent: pct(sem, total),
+    highlightLabel: ESG_HIGHLIGHT_LABEL,
+    highlightValue: split.possuiLigacao,
+    highlightPercent: pct(split.possuiLigacao, baseTotal),
+    secondaryLabel: ESG_SECONDARY_LABEL,
+    secondaryValue: semBanheiro,
+    secondaryPercent: pct(semBanheiro, baseTotal),
     embasaLabel,
     embasaValue: isMunicipio ? (served ? 1 : 0) : embasaCount,
     embasaText: isMunicipio ? (served ? 'Atendido' : 'Não atendido') : null,
     metrics: [
-      { id: 'rede', label: ESG_REDE_LABEL, value: rede, percent: pct(rede, total), color: ESG_COLORS.rede },
-      { id: 'fossa', label: ESG_FOSSA_LABEL, value: fossa, percent: pct(fossa, total), color: ESG_COLORS.fossa },
-      { id: 'rud', label: ESG_RUD_LABEL, value: rud, percent: pct(rud, total), color: ESG_COLORS.rudimentar }
+      {
+        id: 'usa-rede',
+        label: ESG_USA_REDE_LABEL,
+        value: split.usaPrincipal,
+        percent: pct(split.usaPrincipal, split.possuiLigacao),
+        color: ESG_COLORS.rede
+      },
+      {
+        id: 'nao-usa-rede',
+        label: ESG_NAO_USA_REDE_LABEL,
+        value: split.naoUsaPrincipal,
+        percent: pct(split.naoUsaPrincipal, split.possuiLigacao),
+        color: ESG_COLORS.fossa
+      }
     ],
     status: 'ok',
     source: SANEAMENTO_SOURCE
@@ -599,6 +711,8 @@ function statsFromAttributes (attrs: Record<string, any>): Record<string, any> |
     a_out: numFrom(normalized, 'aba_outr', 'aa_outra', 'a_out', 'outros_agua'),
     a_sem: numFrom(normalized, 'aa_npl_rg', 'a_sem', 'sem_rede_geral'),
     e_tot: numFrom(normalized, 'esg_total', 'e_tot'),
+    e_rede_pluvial: numFrom(normalized, 'esg_rede_geral_ou_pluvia', 'esg_rede_geral_ou_pluvial', 'e_rede_pluvial'),
+    e_fossa_ligada: numFrom(normalized, 'esg_fossa_septica_ou_fossa_filtro_ligada_a_rede', 'e_fossa_ligada'),
     e_rede: numFrom(normalized, 'esg_rrpflg', 'e_rede', 'rede_esgoto'),
     e_fossasr: numFrom(normalized, 'esg_fffnlg', 'e_fossasr', 'fossa_septica'),
     e_fossab: numFrom(normalized, 'esg_fr_b', 'e_fossab', 'fossa_rudimentar'),
@@ -610,7 +724,14 @@ function statsFromAttributes (attrs: Record<string, any>): Record<string, any> |
     embasa_e: numFrom(normalized, 'mun_emb_esg', 'embasa_e', 'mun_at_embasa_e')
   }
 
-  if (stats.a_rede == null && stats.e_rede == null && stats.a_tot == null && stats.e_tot == null) {
+  if (stats.e_rede_pluvial == null) {
+    stats.e_rede_pluvial = numFromKeyPattern(normalized, ['esg_rede_geral_ou_pluvia', 'esg_rede_geral_ou_pluvial'])
+  }
+  if (stats.e_fossa_ligada == null) {
+    stats.e_fossa_ligada = numFromKeyPattern(normalized, ['fossa_filtro_ligada'], ['nao_ligada'])
+  }
+
+  if (stats.a_rede == null && stats.e_rede == null && stats.e_rede_pluvial == null && stats.a_tot == null && stats.e_tot == null) {
     return null
   }
   return stats
@@ -687,6 +808,16 @@ async function queryMunSums (layer: any, filter: DashboardFilter): Promise<Recor
     }
     return null
   }
+  const pickIncludes = (...needles: string[]) => {
+    const exact = pick(...needles)
+    if (exact) return exact
+    const entries = Array.from(available.entries()) as Array<[string, string]>
+    for (const needle of needles) {
+      const hit = entries.find(([lower]) => fieldMatchesNeedle(lower, needle))
+      if (hit) return hit[1]
+    }
+    return null
+  }
 
   const statisticMap: Array<{ out: string, field: string | null }> = [
     { out: 'a_tot', field: pick('aa_total', 'a_tot') },
@@ -700,13 +831,20 @@ async function queryMunSums (layer: any, filter: DashboardFilter): Promise<Recor
     { out: 'a_out', field: pick('aa_outra', 'a_out') },
     { out: 'a_sem', field: pick('aa_npl_rg', 'a_sem') },
     { out: 'e_tot', field: pick('esg_total', 'e_tot') },
+    { out: 'e_rede_pluvial', field: pick('esg_rede_geral_ou_pluvia', 'esg_rede_geral_ou_pluvial')
+      || pickLayerFieldByTokens(available, ['pluvia'], ['fossa', 'agua', 'rrpflg', 'l_r_g']) },
+    { out: 'e_fossa_ligada', field: pick(
+      'esg_fossa_septica_ou_fossa_filtro_ligada_a_rede',
+      'esg_fossa_septica_ou_fossa_filtro_ligada',
+      'esg_fossa_septica_ou_fossa_filt'
+    ) || pickLayerFieldByTokens(available, ['fossa', 'ligada'], ['nao', 'rrpflg', 'rudiment', 'pluvia']) },
     { out: 'e_rede', field: pick('esg_rrpflg', 'e_rede') },
     { out: 'e_fossasr', field: pick('esg_fffnlg', 'e_fossasr') },
     { out: 'e_fossab', field: pick('esg_fr_b', 'e_fossab') },
     { out: 'e_sem', field: pick('esg_n_t_bs', 'e_sem') }
   ]
   const existing = statisticMap.filter((item): item is { out: string, field: string } => Boolean(item.field))
-  if (!existing.some((item) => item.out === 'a_rede' || item.out === 'e_rede')) {
+  if (!existing.some((item) => ['a_rede', 'e_rede', 'e_rede_pluvial', 'e_fossa_ligada'].includes(item.out))) {
     throw new Error('Indicadores de saneamento indisponíveis para este recorte')
   }
 
@@ -770,6 +908,12 @@ async function queryMunSums (layer: any, filter: DashboardFilter): Promise<Recor
   ])
   normalized.embasa_aa = embasaAa
   normalized.embasa_e = embasaE
+  const pluvial = n(normalized.e_rede_pluvial)
+  const fossaLigada = n(normalized.e_fossa_ligada)
+  const combined = n(normalized.e_rede)
+  if ((pluvial == null || pluvial === 0) && fossaLigada != null && combined != null && fossaLigada === combined) {
+    normalized.e_fossa_ligada = null
+  }
   return normalized
 }
 
@@ -780,6 +924,35 @@ export async function loadSaneamentoSummaries (
   const scopeLabel = filter?.type === 'all' ? 'Estado da Bahia' : filter.label
 
   try {
+    if (!filter || filter.type === 'all' || filter.type === 'territorio' || filter.type === 'municipio' || filter.type === 'semiarido') {
+      const munLayer = findMunicipioLayer(webMap)
+        || findLayer(webMap, { layerTitle: 'PDA_Indicadores_Censo_2022' })
+        || findLayer(webMap, { layerTitle: 'DPA_Indicadores_Censo_2022' })
+
+      if (filter?.type === 'semiarido') {
+        const record = await loadSemiaridoRecord(webMap)
+        const stats = record ? saneamentoStatsFromRecord(record) : null
+        if (stats && (n(stats.e_rede_pluvial) != null || n(stats.e_fossa_ligada) != null)) {
+          return {
+            agua: buildAguaFromMunStats(stats, scopeLabel, filter.type),
+            esgoto: buildEsgotoFromMunStats(stats, scopeLabel, filter.type)
+          }
+        }
+      }
+
+      if (munLayer && typeof munLayer.queryFeatures === 'function') {
+        const stats = await queryMunSums(munLayer, filter || {
+          type: 'all',
+          label: scopeLabel,
+          munWhere: '1=1'
+        } as DashboardFilter)
+        return {
+          agua: buildAguaFromMunStats(stats, scopeLabel, filter?.type || 'all'),
+          esgoto: buildEsgotoFromMunStats(stats, scopeLabel, filter?.type || 'all')
+        }
+      }
+    }
+
     if (!filter || filter.type === 'all') {
       const layer = findLayer(webMap, { layerTitle: 'Limite Bahia' })
       if (!layer || typeof layer.queryFeatures !== 'function') {

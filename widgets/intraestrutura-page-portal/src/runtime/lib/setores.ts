@@ -119,12 +119,13 @@ export async function searchSetores (
     searchText: string
     tipo?: string
     selectedName?: string | null
+    territorialScope?: boolean
     territorialWhere: (layer: any) => string
   }
 ): Promise<SetorItem[]> {
   const queryText = options.searchText.trim()
   const hasSearch = queryText.length >= 2
-  if (!hasSearch && !options.selectedName) return []
+  if (!hasSearch && !options.selectedName && !options.territorialScope) return []
 
   const layer = findLayer(webMap, { layerTitle: SETOR_LAYER_TITLE })
   if (!layer || typeof layer.queryFeatures !== 'function') return []

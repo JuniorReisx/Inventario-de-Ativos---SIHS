@@ -43,7 +43,16 @@ function mapFeature (attrs: Record<string, any>, fields: {
       populacao: num(pick(attrs, fields.pop, 'estimativa_pop_2025', 'pop_est_2025', 'pop_2025', 'população__2022_', 'populacao__2022_')),
       pessoas_indigenas: num(pick(attrs, 'pessoas_indigenas__2022_')),
       pessoas_quilombolas: num(pick(attrs, 'pessoas_quilombolas__2022_')),
-      total_domicilios: num(pick(attrs, 'total_domicílios_recenseados__2')),
+      total_domicilios: num(pick(
+        attrs,
+        'total_domicílios_recenseados__2',
+        'total_domicilios_recenseados__2',
+        'total_domicílios_recenseados',
+        'dom_rec_2022',
+        'total_domicilios',
+        'tot_dom',
+        'domicilios'
+      )),
       pop_urbana: num(pick(attrs, 'st_d_urba_1')),
       pop_rural: num(pick(attrs, 'st_d_rural_1')),
       aa_total: num(pick(attrs, 'aa_total')),
@@ -56,7 +65,14 @@ function mapFeature (attrs: Record<string, any>, fields: {
       aa_rio: num(pick(attrs, 'aa_racli')),
       aa_outra: num(pick(attrs, 'aa_outra')),
       aa_sem_rede: num(pick(attrs, 'aa_npl_rg')),
-      embasa_agua: text(pick(attrs, 'abastecimento_agua'))
+      embasa_agua: text(pick(
+        attrs,
+        'abastecimento_agua',
+        'embasa_agua',
+        'municipios_embasa',
+        'atendido_embasa',
+        'embasa'
+      ))
     }
   }
 }

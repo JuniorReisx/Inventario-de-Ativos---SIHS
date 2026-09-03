@@ -618,8 +618,14 @@ export function layerScopeWhere (
 
   if (!options.scoped) return original
 
-  if (options.filterTerritorio && tiField) {
-    return municipalityEqualsWhere(tiField, options.filterTerritorio)
+  if (options.filterTerritorio) {
+    const tiWhere = tiField ? municipalityEqualsWhere(tiField, options.filterTerritorio) : ''
+    const names = nameField && options.filteredNames.length
+      ? namesWhere(nameField, options.filteredNames, true)
+      : ''
+    if (tiWhere && names) return `(${tiWhere} OR ${names})`
+    if (tiWhere) return tiWhere
+    if (names) return names
   }
 
   if (options.filterSemiarido && semiField && !options.filterTerritorio) {
@@ -633,7 +639,7 @@ export function layerScopeWhere (
   return original
 }
 
-function applyAssetVisibility (webMap: any, assetType: AssetType): void {
+function applyAssetVisibility (webMap: any, assetType: AssetType, scoped = false): void {
   const visibleTitle = assetType
     ? ASSET_DEFS.find((def) => def.id === assetType)?.layerTitle
     : null
@@ -644,7 +650,16 @@ function applyAssetVisibility (webMap: any, assetType: AssetType): void {
     if (layer.__infraOriginalVisible == null) {
       layer.__infraOriginalVisible = layer.visible !== false
     }
-    layer.visible = visibleTitle ? layerTitle === visibleTitle : layer.__infraOriginalVisible
+    const on = visibleTitle
+      ? layerTitle === visibleTitle
+      : scoped || layer.__infraOriginalVisible
+    layer.visible = on
+    if (!on) continue
+    let parent = layer.parent
+    while (parent && parent !== webMap && parent !== webMap?.layers && typeof parent === 'object' && 'visible' in parent) {
+      parent.visible = true
+      parent = parent.parent
+    }
   }
 }
 
@@ -669,7 +684,7 @@ export async function applyInfraLayerScope (
   const setorSearch = options.setorSearch || ''
   const setorTipo = options.setorTipo || ''
 
-  applyAssetVisibility(webMap, assetType)
+  applyAssetVisibility(webMap, assetType, scoped)
 
   const layers = [
     ...SCOPE_LAYER_TITLES.map((layerTitle) => findLayer(webMap, { layerTitle })),
@@ -716,9 +731,9 @@ export async function applyInfraGeometryFilter (
         return
       }
       try {
-        layerView.filter = { geometry, spatialRelationship: 'contains' }
-      } catch {
         layerView.filter = { geometry, spatialRelationship: 'intersects' }
+      } catch {
+        layerView.filter = { geometry }
       }
     } catch {
       // camada sem filtro espacial

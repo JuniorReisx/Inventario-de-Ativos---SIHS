@@ -12,6 +12,36 @@ let state = {
 function fmt(n){ return Math.round(n||0).toLocaleString('pt-BR'); }
 function fmt1(n){ return (n||0).toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1}); }
 
+function isEmbasaServed (value) {
+  if (value == null || value === '') return false;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  const normalized = String(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
+  if (!normalized || normalized === 'NAO' || normalized === 'N' || normalized === '0' || normalized.includes('NAO ATEND')) {
+    return false;
+  }
+  return (
+    normalized === 'SIM' ||
+    normalized === 'S' ||
+    normalized === '1' ||
+    normalized === 'TRUE' ||
+    normalized === 'ATENDIDO' ||
+    normalized.includes('ATENDIDO') ||
+    normalized.includes('EMBASA')
+  );
+}
+
+function embasaAguaStatus (value) {
+  if (value == null || String(value).trim() === '') return { label: 'Sem informação', kind: 'unknown' };
+  return isEmbasaServed(value)
+    ? { label: 'Atendido', kind: 'yes' }
+    : { label: 'Não atendido', kind: 'no' };
+}
+
 /* Escala do mapa: déficit de adequação (0% = tudo adequado → 100% = nada adequado).
    Paleta azul do abastecimento (escuro = adequado → claro = sem ligação). */
 function colorForPct(p){
@@ -49,14 +79,19 @@ function categoryColors(cats){
 const AA_KEYS = ['aa_rede','aa_poco_prof','aa_poco_raso','aa_fonte','aa_pipa','aa_chuva','aa_rio','aa_outra','aa_sem_rede'];
 
 function sumAa(feats){
-  const out = { aa_total:0 };
+  const out = { aa_total:0, total_domicilios:0 };
   AA_KEYS.forEach(k=> out[k]=0);
   feats.forEach(f=>{
     const p = f.properties;
     out.aa_total += p.aa_total||0;
+    out.total_domicilios += p.total_domicilios||0;
     AA_KEYS.forEach(k=> out[k] += p[k]||0);
   });
   return out;
+}
+
+function totalDomicilios (v) {
+  return (v.total_domicilios||0) > 0 ? v.total_domicilios : (v.aa_total||0);
 }
 
 function classifyAa(v){
@@ -550,31 +585,53 @@ function renderTabAgua(){
   const popUrb = feats.reduce((s,f)=>s+(f.properties.pop_urbana||0),0);
   const popRur = feats.reduce((s,f)=>s+(f.properties.pop_rural||0),0);
   const comForma = Math.max(0, (v.aa_total||0) - (v.aa_sem_rede||0));
+  const outraForma = Math.max(0, comForma - (v.aa_rede||0));
   const pctCom = v.aa_total ? comForma/v.aa_total*100 : 0;
   const pctSem = v.aa_total ? (v.aa_sem_rede||0)/v.aa_total*100 : 0;
+  const pctRede = v.aa_total ? (v.aa_rede||0)/v.aa_total*100 : 0;
+  const pctOutra = v.aa_total ? outraForma/v.aa_total*100 : 0;
 
   const bahiaV = sumAa(GEO.features);
   const bahiaCl = classifyAa(bahiaV);
   const bahiaPop = GEO.features.reduce((s,f)=>s+(f.properties.populacao||0),0);
   const terr = getTerritorioContext();
   const vsBa = !isFullState();
-  const dAdeqBa = cl.pctAdeq - bahiaCl.pctAdeq;
-  const dAdeqTi = terr ? cl.pctAdeq - terr.cl.pctAdeq : null;
+  const bahiaCom = Math.max(0, (bahiaV.aa_total||0) - (bahiaV.aa_sem_rede||0));
+  const bahiaOutra = Math.max(0, bahiaCom - (bahiaV.aa_rede||0));
+  const bahiaPctRede = bahiaV.aa_total ? (bahiaV.aa_rede||0)/bahiaV.aa_total*100 : 0;
+  const bahiaPctOutra = bahiaV.aa_total ? bahiaOutra/bahiaV.aa_total*100 : 0;
+  const terrCom = terr ? Math.max(0, (terr.v.aa_total||0) - (terr.v.aa_sem_rede||0)) : 0;
+  const terrOutra = terr ? Math.max(0, terrCom - (terr.v.aa_rede||0)) : 0;
+  const terrPctRede = terr && terr.v.aa_total ? (terr.v.aa_rede||0)/terr.v.aa_total*100 : null;
+  const terrPctOutra = terr && terr.v.aa_total ? terrOutra/terr.v.aa_total*100 : null;
+  const dRedeBa = pctRede - bahiaPctRede;
+  const dRedeTi = terrPctRede != null ? pctRede - terrPctRede : null;
+  const dOutraBa = pctOutra - bahiaPctOutra;
+  const dOutraTi = terrPctOutra != null ? pctOutra - terrPctOutra : null;
 
   document.getElementById('kpiRow-agua').innerHTML = `
     <div class="kpi">${infoTip('Quantidade de municípios incluídos no filtro ou município atualmente selecionado.')}
       <div class="val">${fmt(feats.length)}</div><div class="lbl">Municípios na seleção</div></div>
     <div class="kpi">${infoTip('População residente (Censo IBGE 2022) somada dos municípios da seleção.')}
       <div class="val">${fmt(pop)}</div><div class="lbl">População (Censo 2022)</div></div>
-    <div class="kpi bom">${infoTip('Domicílios com alguma forma de abastecimento declarada = total menos a categoria “não possui ligação à rede geral” (SIDRA).')}
-      <div class="val">${fmt(comForma)}</div><div class="sub">${fmt1(pctCom)}%</div><div class="lbl">Domicílios c/ forma de abastecimento</div></div>
+    <div class="kpi">${infoTip('Total de domicílios particulares permanentes recenseados no recorte (Censo IBGE 2022 · DPA Indicadores: total_domicílios_recenseados / dom_rec_2022).')}
+      <div class="val">${fmt(totalDomicilios(v))}</div><div class="lbl">Total de domicílios</div></div>
+    <div class="kpi bom">${infoTip('Domicílios que possuem ligação à rede geral de distribuição (SIDRA): total menos a categoria “não possui ligação à rede geral”.')}
+      <div class="val">${fmt(comForma)}</div><div class="sub">${fmt1(pctCom)}%</div><div class="lbl">Possui ligação à rede geral</div></div>
     <div class="kpi alerta">${infoTip('Domicílios sem ligação à rede geral de distribuição, conforme SIDRA/Censo 2022.')}
       <div class="val">${fmt(v.aa_sem_rede)}</div><div class="sub">${fmt1(pctSem)}%</div><div class="lbl">Sem ligação à rede geral</div></div>
-    <div class="kpi">${infoTip('Percentual de domicílios com abastecimento adequado: rede geral + poço profundo/artesiano + poço raso/freático/cacimba. “Acima/abaixo da Bahia (ou do território)” é a diferença entre os percentuais — se o município tem 71% e a Bahia 83%, está 12 abaixo da Bahia.')}
-      <div class="val">${fmt1(cl.pctAdeq)}%</div>
-      ${vsBa?`<div class="sub vs-ba-kpi ${deltaClass(dAdeqBa,true)}">${fmtDeltaVs(dAdeqBa, 'Bahia')}</div>`:''}
-      ${dAdeqTi!=null?`<div class="sub vs-ba-kpi ${deltaClass(dAdeqTi,true)}">${fmtDeltaVs(dAdeqTi, 'território')}</div>`:''}
-      <div class="lbl">Atendimento adequado</div></div>
+    <div class="kpi bom">${infoTip('Domicílios cuja forma principal de abastecimento é a rede geral de distribuição (SIDRA / Censo 2022).')}
+      <div class="val">${fmt(v.aa_rede)}</div>
+      <div class="sub">${fmt1(pctRede)}%</div>
+      ${vsBa?`<div class="sub vs-ba-kpi ${deltaClass(dRedeBa,true)}">${fmtDeltaVs(dRedeBa, 'Bahia')}</div>`:''}
+      ${dRedeTi!=null?`<div class="sub vs-ba-kpi ${deltaClass(dRedeTi,true)}">${fmtDeltaVs(dRedeTi, 'território')}</div>`:''}
+      <div class="lbl">Possui ligação à rede geral e a utiliza como forma principal</div></div>
+    <div class="kpi">${infoTip('Domicílios com ligação à rede geral que, no entanto, declaram outra forma como principal: quem possui ligação menos quem usa a rede como forma principal.')}
+      <div class="val">${fmt(outraForma)}</div>
+      <div class="sub">${fmt1(pctOutra)}%</div>
+      ${vsBa?`<div class="sub vs-ba-kpi ${deltaClass(dOutraBa,false)}">${fmtDeltaVs(dOutraBa, 'Bahia')}</div>`:''}
+      ${dOutraTi!=null?`<div class="sub vs-ba-kpi ${deltaClass(dOutraTi,false)}">${fmtDeltaVs(dOutraTi, 'território')}</div>`:''}
+      <div class="lbl">Possui ligação à rede geral, mas utiliza principalmente outra forma</div></div>
   `;
 
   const colors = categoryColors(AA_COMP_CATS);
@@ -629,12 +686,12 @@ function renderMuniDetail(){
 
   document.getElementById('muniDetailName').textContent = p.nm_mun;
 
-  const aa = classifyAa(p);
+  const embasa = embasaAguaStatus(p.embasa_agua);
   const meta = [p.territorio, p.semiarido==='SIM' ? 'Semiárido' : null].filter(Boolean).join(' · ');
   document.getElementById('muniDetailBody').innerHTML = `
     <p class="muni-detail-meta" title="${meta}">${meta}</p>
     <div class="detail-grid">
-      <div class="detail-item"><div class="v">${fmt1(aa.pctAdeq)}%</div><div class="l">Água adequada</div></div>
+      <div class="detail-item is-embasa is-${embasa.kind}"><div class="v text">${embasa.label}</div><div class="l">Atendido pela Embasa</div></div>
       <div class="detail-item"><div class="v">${fmt(p.populacao)}</div><div class="l">População</div></div>
       <div class="detail-item"><div class="v">${fmt(p.aa_total)}</div><div class="l">Domicílios</div></div>
       <div class="detail-item wide"><div class="v text">${p.territorio}</div><div class="l">Território de Identidade</div></div>

@@ -117,13 +117,23 @@ const FIELD_HINTS: Record<string, FieldHint> = {
   },
   e_rede: {
     names: ['esg_rrpflg', 'e_rede', 'rede_esgoto'],
-    phrases: ['rede de esgoto', 'rede pluvial', 'conexao a rede de esgoto'],
-    exclude: ['abastec', 'perc', 'sem', 'agua principal']
+    phrases: ['rede de esgoto', 'conexao a rede de esgoto'],
+    exclude: ['abastec', 'perc', 'sem', 'agua principal', 'rede geral ou pluvia', 'fossa filtro ligada']
+  },
+  e_rede_pluvial: {
+    names: ['esg_rede_geral_ou_pluvia', 'esg_rede_geral_ou_pluvial', 'e_rede_pluvial'],
+    phrases: ['rede geral ou pluvia', 'esgoto rede geral ou pluvial'],
+    exclude: ['abastec', 'perc', 'fossa', 'nao ligada']
+  },
+  e_fossa_ligada: {
+    names: ['esg_fossa_septica_ou_fossa_filtro_ligada_a_rede', 'e_fossa_ligada'],
+    phrases: ['fossa filtro ligada a rede', 'fossa septica ou fossa filtro ligada'],
+    exclude: ['nao ligada', 'rudiment', 'perc', 'abastec']
   },
   e_fossasr: {
     names: ['esg_fffnlg', 'e_fossasr', 'fossa_septica'],
     phrases: ['fossa septica ou fossa filtro', 'fossa filtro nao ligada'],
-    exclude: ['rudiment', 'perc', 'buraco']
+    exclude: ['rudiment', 'perc', 'buraco', 'ligada a rede']
   },
   e_fossab: {
     names: ['esg_fr_b', 'e_fossab', 'fossa_rudimentar'],
@@ -344,6 +354,8 @@ export function saneamentoStatsFromRecord (record: SemiaridoRecord): Record<stri
     a_out: pickSemiaridoById(record, 'a_out'),
     a_sem: pickSemiaridoById(record, 'a_sem'),
     e_tot: pickSemiaridoById(record, 'e_tot'),
+    e_rede_pluvial: pickSemiaridoById(record, 'e_rede_pluvial'),
+    e_fossa_ligada: pickSemiaridoById(record, 'e_fossa_ligada'),
     e_rede: pickSemiaridoById(record, 'e_rede'),
     e_fossasr: pickSemiaridoById(record, 'e_fossasr'),
     e_fossab: pickSemiaridoById(record, 'e_fossab'),
@@ -358,6 +370,7 @@ export function saneamentoStatsFromRecord (record: SemiaridoRecord): Record<stri
   if (
     stats.a_rede == null &&
     stats.e_rede == null &&
+    stats.e_rede_pluvial == null &&
     stats.a_tot == null &&
     stats.e_tot == null &&
     stats.a_sem == null &&
