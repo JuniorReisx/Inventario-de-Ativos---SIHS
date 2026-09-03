@@ -1,0 +1,12 @@
+{
+  "name": "sihs-agua",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Painel Água SIHS — Bahia (SIDRA/Censo 2022)",
+  "scripts": {
+    "convert-shp": "node scripts/convert-shp.js"
+  },
+  "dependencies": {
+    "shapefile": "^0.6.6"
+  }
+}

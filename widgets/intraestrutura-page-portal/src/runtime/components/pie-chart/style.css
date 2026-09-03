@@ -1,0 +1,264 @@
+.infra-bars {
+  display: flex;
+  flex-direction: column;
+  min-height: 168px;
+  gap: 0.7rem;
+}
+
+.infra-bars__empty {
+  margin: 0;
+  color: #5d7380;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.infra-pie {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.infra-pie__viz {
+  position: relative;
+  width: 188px;
+  height: 188px;
+  flex: 0 0 auto;
+}
+
+.infra-pie__viz svg {
+  display: block;
+  width: 188px;
+  height: 188px;
+  filter: drop-shadow(0 8px 16px rgba(0, 33, 59, 0.12));
+  overflow: visible;
+}
+
+.infra-pie__viz path,
+.infra-pie__viz circle {
+  cursor: pointer;
+  outline: none;
+  transition: opacity 140ms ease, filter 140ms ease;
+}
+
+.infra-pie__viz path.is-dim,
+.infra-pie__viz circle.is-dim {
+  opacity: 0.38;
+}
+
+.infra-pie__viz path.is-hot,
+.infra-pie__viz circle.is-hot {
+  filter: brightness(1.08);
+}
+
+.infra-pie__center {
+  position: absolute;
+  inset: 34%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+  padding: 0 0.2rem;
+}
+
+.infra-pie__center span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #5d7380;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.infra-pie__center strong {
+  color: #001824;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.infra-pie__center em {
+  color: #0a5c66;
+  font-style: normal;
+  font-size: 0.64rem;
+  font-weight: 700;
+}
+
+.infra-pie__legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: grid;
+  gap: 0.22rem;
+  max-height: 210px;
+  overflow: auto;
+}
+
+.infra-pie__legend li {
+  min-width: 0;
+}
+
+.infra-pie__legend li.is-dim {
+  opacity: 0.45;
+}
+
+.infra-pie__legend button {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  gap: 0.42rem;
+  align-items: start;
+  width: 100%;
+  margin: 0;
+  padding: 0.32rem 0.4rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.infra-pie__legend li.is-active button,
+.infra-pie__legend button:hover {
+  background: #f0f6f9;
+}
+
+.infra-pie__legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-top: 0.22rem;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+}
+
+.infra-pie__legend span {
+  color: #244354;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.infra-pie__legend small {
+  display: block;
+  margin-top: 0.04rem;
+  color: #5d7380;
+  font-size: 0.6rem;
+  font-weight: 600;
+}
+
+.infra-pie__legend b,
+.infra-pie__legend em {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  margin-top: 0.08rem;
+}
+
+.infra-pie__legend b {
+  color: #001824;
+  font-weight: 800;
+}
+
+.infra-pie__legend em {
+  color: #0a5c66;
+  font-style: normal;
+  font-weight: 700;
+  min-width: 3.2rem;
+  text-align: right;
+}
+
+.infra-pie__outros-toggle {
+  align-self: flex-start;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #0a5c66;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.infra-pie__outros {
+  padding: 0.55rem 0.65rem 0.6rem;
+  border-radius: 10px;
+  background: #f4f8fb;
+  border: 1px solid #d7e2ea;
+}
+
+.infra-pie__outros p {
+  margin: 0 0 0.4rem;
+  color: #5d7380;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.infra-pie__outros ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.28rem;
+}
+
+.infra-pie__outros li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.infra-pie__outros span {
+  color: #244354;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.infra-pie__outros small {
+  display: block;
+  color: #5d7380;
+  font-size: 0.6rem;
+}
+
+.infra-pie__outros b,
+.infra-pie__outros em {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.infra-pie__outros b {
+  color: #001824;
+  font-weight: 800;
+}
+
+.infra-pie__outros em {
+  color: #5d7380;
+  font-style: normal;
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .infra-pie {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .infra-pie__legend {
+    width: 100%;
+  }
+}

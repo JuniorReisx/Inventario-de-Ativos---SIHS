@@ -1,0 +1,32 @@
+PAINEL ÁGUA — BAHIA (SIDRA / Censo 2022)
+==============================================
+
+O widget da Experience Builder usa o web map do Portal da Água:
+
+  https://portaldaagua.sihs.ba.gov.br/portal/home/item.html?id=42e3cea83e0b4b86b4b34e015ac722c6
+
+  ABASTECIMENTO - Inventário de Ativos
+
+Os indicadores do painel (KPIs, filtros, gráficos) vêm da camada
+DPA_Indicadores_Censo_2022 desse web map. Aglomerados ficam em js/pts-data.js.
+
+ESTRUTURA DO WIDGET
+--------------------
+  src/runtime/          — widget Experience Builder
+  js/pts-data.js        — aglomerados rurais por município
+  js/painel.js          — lógica original do painel (referência)
+  SHP/                  — shapefile Indicadores_Sidra_BA (arquivo local, não usado pelo widget)
+
+O QUE TEM DENTRO DO PAINEL
+----------------------------
+Visão de Água com:
+  - Web map do portal (todas as camadas publicadas)
+  - Filtro por Território de Identidade ou Semiárido
+  - Consulta por município
+  - Donut adequado / inadequado / sem ligação à rede
+  - Composição SIDRA (rede, poço profundo, poço raso, fonte, pipa, etc.)
+
+Adequado = rede geral de distribuição + poço profundo/artesiano +
+poço raso/freático/cacimba.
+
+Fonte: IBGE Censo Demográfico 2022 / SIDRA — camada DPA_Indicadores_Censo_2022.

@@ -1,0 +1,21 @@
+{
+  "name": "inventario-page-portal",
+  "label": "Inventário Page Portal",
+  "type": "widget",
+  "version": "1.17.0",
+  "exbVersion": "1.17.0",
+  "author": "SIHS",
+  "description": "Página inicial do Inventário Hídrico: hero, cards de navegação e dashboard de indicadores.",
+  "copyright": "",
+  "license": "",
+  "dependency": ["jimu-arcgis"],
+  "properties": {
+    "hasConfig": false,
+    "cover": true
+  },
+  "translatedLocales": ["en"],
+  "defaultSize": {
+    "width": 1400,
+    "height": 1800
+  }
+}

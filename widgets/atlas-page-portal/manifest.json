@@ -1,0 +1,21 @@
+{
+  "name": "atlas-page-portal",
+  "label": "Atlas Page Portal",
+  "type": "widget",
+  "version": "1.17.0",
+  "exbVersion": "1.17.0",
+  "author": "SIHS",
+  "description": "Atlas do Portal da Água: web map interativo de camadas hídricas da Bahia.",
+  "copyright": "",
+  "license": "",
+  "dependency": ["jimu-arcgis"],
+  "properties": {
+    "hasConfig": false,
+    "cover": true
+  },
+  "translatedLocales": ["en"],
+  "defaultSize": {
+    "width": 1400,
+    "height": 900
+  }
+}

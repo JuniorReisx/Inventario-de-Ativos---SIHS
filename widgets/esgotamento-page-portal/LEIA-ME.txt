@@ -1,0 +1,67 @@
+PAINEL ESGOTO — BAHIA (SIDRA / Censo 2022)
+==============================================
+
+O QUE VOCÊ PRECISA PARA ABRIR O PAINEL
+-----------------------------------------
+Abra o arquivo:
+     painel_SIHS.html
+
+Dê duplo clique nele e ele abre no navegador padrão (Chrome, Edge ou
+Firefox recomendados). Não precisa instalar nada nem de internet.
+
+IMPORTANTE: mantenha a pasta completa (painel_SIHS.html + pastas css/,
+js/ e data/). O HTML referencia esses arquivos externos. Para enviar
+a outra pessoa, compacte a pasta inteira em .zip — não envie só o .html.
+
+ESTRUTURA DO PROJETO
+--------------------
+  painel_SIHS.html   — estrutura HTML do painel
+  css/painel.css     — estilos visuais
+  js/painel.js       — lógica do painel (mapa, filtros, indicadores)
+  js/geo-data.js     — GeoJSON dos 417 municípios + indicadores SIDRA
+  data/geo-data.json — mesmos dados em JSON (referência)
+  SHP/               — shapefile de origem (Indicadores_Sidra_BA)
+  scripts/convert-shp.js — regenera js/geo-data.js a partir do SHP
+
+O arquivo é grande porque carrega o mapa e os dados de todos os
+417 municípios de uma vez. Pode levar alguns segundos para abrir.
+
+PASTA "SHP/"
+------------
+Shapefile atual consumido pelo painel:
+  Indicadores_Sidra_BA.shp (+ .dbf, .shx, .prj, .cpg, …)
+
+Contém limites municipais da Bahia e indicadores SIDRA/IBGE
+(Censo 2022) de esgotamento sanitário e abastecimento de água,
+agregados por município e Território de Identidade.
+
+Para regenerar os dados do painel após trocar o shapefile:
+
+  npm install
+  npm run convert-shp
+
+PASTA "shapefile_municipios/"
+--------------------------------
+Shapefile anterior (MUNICIPIOS_MEIOSOCIO_SANERURAL_2025), mantido
+apenas como referência histórica. O painel NÃO usa mais essa pasta.
+
+COMO ENVIAR PARA OUTRAS PESSOAS
+--------------------------------
+Os arquivos do painel ficam na pasta do widget (esgotamento-page-portal),
+sem node_modules/.
+
+O QUE TEM DENTRO DO PAINEL
+----------------------------
+Visão de Esgoto com:
+  - Filtro por Território de Identidade (27) ou Semiárido (SIM/NÃO)
+  - Consulta por município
+  - Mapa colorido pelo % de atendimento adequado
+  - Donut adequado / inadequado / sem banheiro
+  - Composição SIDRA (rede, fossa séptica, fossa rudimentar, vala, etc.)
+
+Adequado = rede geral/pluvial ou fossa ligada à rede + fossa
+séptica/filtro não ligada à rede (SIDRA tabela 6805).
+
+Fonte: IBGE Censo Demográfico 2022 / SIDRA — Indicadores_Sidra_BA.
+
+Versão gerada em: verifique a data no próprio painel (rodapé).

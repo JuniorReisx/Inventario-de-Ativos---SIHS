@@ -1,0 +1,432 @@
+.kaio-chat {
+  --kaio-navy: #00213b;
+  --kaio-navy-soft: #0a3354;
+  --kaio-fab: #0c6d9e;
+  --kaio-cyan: #23aee2;
+  --kaio-cyan-deep: #0a5f8a;
+  --kaio-ink: #1a1f24;
+  --kaio-muted: #5b6b78;
+  --kaio-line: #d5dee6;
+  --kaio-panel: #f7fafc;
+  position: fixed;
+  right: 1.15rem;
+  bottom: 5.4rem;
+  z-index: 14000;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 0.85rem;
+  font-family: "Source Sans 3", "Segoe UI", sans-serif;
+  pointer-events: none;
+}
+
+.kaio-chat > * {
+  pointer-events: auto;
+}
+
+.kaio-chat__fab {
+  position: relative;
+  width: 3.65rem;
+  height: 3.65rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--kaio-fab);
+  color: #fff;
+  box-shadow:
+    0 0 0 3px #fff,
+    0 12px 28px rgba(0, 33, 59, 0.22);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.kaio-chat__fab:hover {
+  transform: translateY(-2px) scale(1.04);
+  background: #0a5f8a;
+  box-shadow:
+    0 0 0 3px #fff,
+    0 16px 32px rgba(0, 33, 59, 0.28);
+}
+
+.kaio-chat.is-open .kaio-chat__fab {
+  background: var(--kaio-navy);
+}
+
+.kaio-chat.is-open .kaio-chat__fab:hover {
+  background: #003155;
+}
+
+.kaio-chat__fab-svg {
+  width: 1.55rem;
+  height: 1.55rem;
+  display: block;
+}
+
+.kaio-chat__panel {
+  position: relative;
+  width: min(380px, calc(100vw - 2rem));
+  max-height: min(540px, calc(100vh - 150px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(0, 33, 59, 0.08);
+  border-radius: 20px;
+  background: var(--kaio-panel);
+  box-shadow:
+    0 24px 48px rgba(0, 33, 59, 0.18),
+    0 2px 8px rgba(0, 33, 59, 0.06);
+  transform-origin: bottom right;
+}
+
+.kaio-chat:not(.is-open) .kaio-chat__panel {
+  display: none;
+}
+
+.kaio-chat__head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  background:
+    radial-gradient(ellipse 80% 120% at 0% 0%, rgba(35, 174, 226, 0.35), transparent 55%),
+    linear-gradient(180deg, #00213b 0%, #07324f 100%);
+  color: #fff;
+}
+
+.kaio-chat__avatar-btn {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 50%;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.kaio-chat__avatar-btn:hover .kaio-chat__avatar,
+.kaio-chat__avatar-btn:hover .kaio-chat__bubble-avatar {
+  transform: scale(1.06);
+  box-shadow: 0 0 0 3px rgba(35, 174, 226, 0.55);
+}
+
+.kaio-chat__avatar,
+.kaio-chat__bubble-avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: 50% 42%;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(35, 174, 226, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kaio-chat__avatar {
+  width: 2.65rem;
+  height: 2.65rem;
+}
+
+.kaio-chat__bubble-avatar {
+  width: 1.85rem;
+  height: 1.85rem;
+  margin-top: 0.15rem;
+  box-shadow: none;
+}
+
+.kaio-chat__name {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 800;
+}
+
+.kaio-chat__role {
+  margin: 0.12rem 0 0;
+  font-size: 0.72rem;
+  color: #b7d8e4;
+}
+
+.kaio-chat__clear {
+  margin-left: auto;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8f6fb;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+}
+
+.kaio-chat__clear:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.kaio-chat__messages {
+  flex: 1;
+  min-height: 180px;
+  overflow: auto;
+  padding: 0.95rem;
+}
+
+.kaio-chat__row {
+  display: flex;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.kaio-chat__row--user {
+  justify-content: flex-end;
+}
+
+.kaio-chat__bubble {
+  max-width: 78%;
+  padding: 0.72rem 0.88rem;
+  border-radius: 16px;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.kaio-chat__row--assistant .kaio-chat__bubble {
+  background: #fff;
+  color: var(--kaio-ink);
+  border: 1px solid var(--kaio-line);
+  border-bottom-left-radius: 5px;
+  box-shadow: 0 4px 12px rgba(0, 33, 59, 0.05);
+}
+
+.kaio-chat__row--user .kaio-chat__bubble {
+  background: var(--kaio-navy);
+  color: #fff;
+  border-bottom-right-radius: 5px;
+}
+
+.kaio-chat__dots {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.28rem;
+  min-height: 1rem;
+}
+
+.kaio-chat__dots span {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--kaio-cyan);
+  animation: kaio-bounce 0.9s infinite ease-in-out;
+}
+
+.kaio-chat__dots span:nth-child(2) { animation-delay: 0.15s; }
+.kaio-chat__dots span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes kaio-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.45; }
+  40% { transform: translateY(-4px); opacity: 1; }
+}
+
+.kaio-chat__composer {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 0.85rem 0.9rem;
+  border-top: 1px solid var(--kaio-line);
+  background: #fff;
+}
+
+.kaio-chat__composer textarea {
+  flex: 1;
+  min-height: 2.55rem;
+  max-height: 5.5rem;
+  resize: none;
+  padding: 0.58rem 0.75rem;
+  border: 1px solid var(--kaio-line);
+  border-radius: 14px;
+  font: inherit;
+  font-size: 0.86rem;
+  color: var(--kaio-ink);
+  line-height: 1.45;
+  background: #f8fbfd;
+}
+
+.kaio-chat__composer textarea:focus {
+  outline: none;
+  border-color: var(--kaio-cyan);
+  box-shadow: 0 0 0 3px rgba(35, 174, 226, 0.18);
+  background: #fff;
+}
+
+.kaio-chat__send {
+  width: 2.55rem;
+  height: 2.55rem;
+  border: 0;
+  border-radius: 14px;
+  background: var(--kaio-fab);
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.kaio-chat__send svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  transform: rotate(90deg);
+}
+
+.kaio-chat__send:hover:not(:disabled) {
+  background: var(--kaio-cyan-deep);
+  transform: translateY(-1px);
+}
+
+.kaio-chat__send:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.kaio-chat__profile {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  overflow: auto;
+}
+
+.kaio-chat__profile-close {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  z-index: 2;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 13, 20, 0.45);
+  color: #fff;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.kaio-chat__profile-hero {
+  position: relative;
+  height: 248px;
+  flex: 0 0 auto;
+  background: linear-gradient(180deg, #00213b 0%, #0a5c66 100%);
+  overflow: hidden;
+}
+
+.kaio-chat__profile-hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+.kaio-chat__profile-live {
+  position: absolute;
+  left: 0.85rem;
+  bottom: 0.75rem;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(0, 33, 59, 0.72);
+  color: #9fe7c4;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.kaio-chat__profile-body {
+  padding: 1rem 1.05rem 1.15rem;
+}
+
+.kaio-chat__profile-kicker {
+  margin: 0;
+  color: #0a5c66;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.kaio-chat__profile-body h3 {
+  margin: 0.2rem 0 0.45rem;
+  color: #00213b;
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.kaio-chat__profile-bio {
+  margin: 0 0 0.85rem;
+  color: #3d4f59;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.kaio-chat__profile-facts {
+  margin: 0 0 0.85rem;
+  padding: 0.7rem 0.8rem;
+  list-style: none;
+  border-radius: 14px;
+  background: #f3f8fb;
+}
+
+.kaio-chat__profile-facts li {
+  padding: 0.28rem 0;
+  color: #234150;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.kaio-chat__profile-facts strong {
+  display: inline-block;
+  min-width: 6.4rem;
+  color: #0a5c66;
+}
+
+.kaio-chat__profile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.95rem;
+}
+
+.kaio-chat__profile-tags span {
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(47, 196, 255, 0.14);
+  color: #0a5c66;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.kaio-chat__profile-back {
+  width: 100%;
+  height: 2.45rem;
+  border: 0;
+  border-radius: 12px;
+  background: #0c6d9e;
+  color: #fff;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.kaio-chat__profile-back:hover {
+  background: #0a5f8a;
+}
+
+@media (max-width: 720px) {
+  .kaio-chat {
+    right: 0.75rem;
+    left: auto;
+    bottom: 4.7rem;
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "sobre-page-portal",
+  "label": "Sobre Page Portal",
+  "type": "widget",
+  "version": "1.17.0",
+  "exbVersion": "1.17.0",
+  "author": "SIHS",
+  "description": "Página Sobre do Portal da Água.",
+  "copyright": "",
+  "license": "",
+  "properties": {
+    "hasConfig": false,
+    "cover": true
+  },
+  "translatedLocales": ["en"],
+  "defaultSize": {
+    "width": 1400,
+    "height": 900
+  }
+}

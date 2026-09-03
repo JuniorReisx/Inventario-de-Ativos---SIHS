@@ -1,0 +1,338 @@
+.sobre-body {
+  --ink: #002231;
+  --ink-2: #1c2b33;
+  --muted: #4f6470;
+  --line: #d7e3ea;
+  --paper: #f4f8fb;
+  --card: #ffffff;
+  --aqua: #2fc4ff;
+  --cyan: #1aa8c8;
+  --cyan-soft: #5ec8de;
+  --navy: #001824;
+  --navy-2: #002231;
+  --accent: #0a7fa8;
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0.35rem 1.15rem 2.4rem;
+  color: var(--ink-2);
+}
+
+.sobre-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 1.1rem 0 1.6rem;
+}
+
+.sobre-jump a {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.38rem 0.78rem;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 650;
+  text-decoration: none;
+  letter-spacing: 0.01em;
+}
+
+.sobre-jump a:hover,
+.sobre-jump a:focus-visible {
+  border-color: var(--cyan);
+  color: var(--accent);
+  outline: none;
+}
+
+.sobre-kicker {
+  margin: 0 0 0.45rem;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.sobre-intro h2,
+.sobre-block__head h2 {
+  margin: 0;
+  font-size: clamp(1.55rem, 3vw, 2.15rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.sobre-lead,
+.sobre-block__head p {
+  margin: 0.85rem 0 0;
+  max-width: 68ch;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.sobre-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.15rem;
+}
+
+.sobre-pills span {
+  padding: 0.32rem 0.7rem;
+  border-radius: 999px;
+  background: #e8f6fb;
+  color: #0f5876;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.sobre-block {
+  margin-top: 2.4rem;
+  padding-top: 1.8rem;
+  border-top: 1px solid var(--line);
+}
+
+.sobre-block--last {
+  margin-bottom: 0.4rem;
+}
+
+.sobre-steps {
+  list-style: none;
+  margin: 1.35rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.sobre-steps li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.85rem;
+  align-items: start;
+  padding: 1.05rem 1.1rem;
+  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+
+.sobre-steps__n {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: var(--navy-2);
+  color: #fff;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.sobre-steps h3,
+.sobre-module h3,
+.sobre-read h3,
+.sobre-dev h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 750;
+  color: var(--ink);
+}
+
+.sobre-steps p,
+.sobre-module p,
+.sobre-read p,
+.sobre-dev p {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.sobre-modules {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1.35rem;
+}
+
+.sobre-module {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  padding: 1.15rem 1.2rem 1.05rem;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  min-width: 0;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.sobre-module:hover,
+.sobre-module:focus-visible {
+  border-color: var(--cyan);
+  box-shadow: 0 10px 24px rgba(0, 34, 49, 0.08);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.sobre-module__idx {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+.sobre-module h3 {
+  margin-top: 0.4rem;
+}
+
+.sobre-module__go {
+  margin-top: 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.sobre-reads {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1.35rem;
+}
+
+.sobre-read {
+  padding: 1.2rem 1.25rem;
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse 70% 80% at 0% 0%, rgba(47, 196, 255, 0.16), transparent 60%),
+    linear-gradient(165deg, #002231 0%, #001824 100%);
+  color: #f4fbfc;
+}
+
+.sobre-read--alt {
+  background:
+    radial-gradient(ellipse 70% 80% at 100% 0%, rgba(26, 168, 200, 0.2), transparent 60%),
+    linear-gradient(165deg, #0a5c66 0%, #002231 100%);
+}
+
+.sobre-read h3,
+.sobre-read p {
+  color: #f4fbfc;
+}
+
+.sobre-read p {
+  color: rgba(244, 251, 252, 0.86);
+}
+
+.sobre-read__tag {
+  display: inline-block;
+  margin-bottom: 0.55rem;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cyan-soft);
+}
+
+.sobre-read__note {
+  margin-top: 0.75rem !important;
+  padding-top: 0.7rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  font-weight: 650;
+}
+
+.sobre-table-wrap {
+  margin-top: 1.2rem;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.sobre-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+}
+
+.sobre-table th,
+.sobre-table td {
+  padding: 0.85rem 1rem;
+  text-align: left;
+  vertical-align: top;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.sobre-table thead th {
+  background: #002231;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sobre-table tbody th {
+  width: 34%;
+  color: var(--ink);
+  font-weight: 700;
+  background: #f7fbfd;
+  border-bottom: 1px solid var(--line);
+}
+
+.sobre-table tbody td {
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+
+.sobre-table tbody tr:last-child th,
+.sobre-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.sobre-dev {
+  list-style: none;
+  margin: 1.35rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.sobre-dev li {
+  padding: 1.1rem 1.15rem;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid var(--line);
+}
+
+@media (max-width: 860px) {
+  .sobre-steps,
+  .sobre-modules,
+  .sobre-reads,
+  .sobre-dev {
+    grid-template-columns: 1fr;
+  }
+
+  .sobre-body {
+    padding: 0.2rem 0.85rem 2rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sobre-module {
+    transition: none;
+  }
+}

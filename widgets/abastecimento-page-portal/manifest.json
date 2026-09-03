@@ -1,0 +1,21 @@
+{
+  "name": "abastecimento-page-portal",
+  "label": "Abastecimento Page Portal",
+  "type": "widget",
+  "version": "1.17.0",
+  "exbVersion": "1.17.0",
+  "author": "SIHS",
+  "description": "Página de Abastecimento de Água do portal, com painel SIDRA/Censo 2022.",
+  "copyright": "",
+  "license": "",
+  "dependency": ["jimu-arcgis"],
+  "properties": {
+    "hasConfig": false,
+    "cover": true
+  },
+  "translatedLocales": ["en"],
+  "defaultSize": {
+    "width": 1400,
+    "height": 2400
+  }
+}

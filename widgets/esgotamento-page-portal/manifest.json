@@ -1,0 +1,21 @@
+{
+  "name": "esgotamento-page-portal",
+  "label": "Esgotamento Page Portal",
+  "type": "widget",
+  "version": "1.17.0",
+  "exbVersion": "1.17.0",
+  "author": "SIHS",
+  "description": "Página de Esgotamento Sanitário do portal, com painel SIDRA/Censo 2022.",
+  "copyright": "",
+  "license": "",
+  "dependency": ["jimu-arcgis"],
+  "properties": {
+    "hasConfig": false,
+    "cover": true
+  },
+  "translatedLocales": ["en"],
+  "defaultSize": {
+    "width": 1400,
+    "height": 2400
+  }
+}

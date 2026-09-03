@@ -1,0 +1,6 @@
+{
+  "portalUrl": "https://portaldaagua.sihs.ba.gov.br/portal",
+  "webMapId": "de4fe17750f04ab5b3385733684604c8",
+  "oauthAppId": "",
+  "chatApiUrl": "https://sihs-ia-inventario.onrender.com/api/chat"
+}

@@ -1,0 +1,114 @@
+.portal-loader {
+  --loader-ring: #1aa8c8;
+  --loader-fill: #0a5c66;
+  --loader-foam: #f4fbfd;
+  --loader-glow: rgba(47, 196, 255, 0.45);
+  --loader-label: #04385c;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+  margin: 0 auto;
+}
+
+.portal-loader .loader {
+  position: relative;
+  flex: 0 0 auto;
+  margin: 0 auto;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  box-shadow:
+    0 0 0 2px var(--loader-ring),
+    0 8px 22px var(--loader-glow);
+}
+
+.portal-loader .loader::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  border: 2px solid var(--loader-ring);
+  opacity: 0;
+  animation: loader-halo 2.2s ease-out infinite;
+}
+
+.portal-loader.is-compact .loader {
+  width: 58px;
+  height: 58px;
+}
+
+.portal-loader .waves {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.22), transparent 46%),
+    var(--loader-fill);
+  box-shadow: inset 0 0 28px rgba(0, 13, 20, 0.35);
+}
+
+.portal-loader .waves::before,
+.portal-loader .waves::after {
+  content: "";
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -75%);
+}
+
+.portal-loader .waves::before {
+  border-radius: 45%;
+  background: var(--loader-foam);
+  animation: wave91234 4.6s linear infinite;
+}
+
+.portal-loader .waves::after {
+  border-radius: 40%;
+  background: rgba(255, 255, 255, 0.42);
+  animation: wave91234 8.5s linear infinite reverse;
+}
+
+@keyframes wave91234 {
+  0% { transform: translate(-50%, -75%) rotate(0deg); }
+  100% { transform: translate(-50%, -75%) rotate(360deg); }
+}
+
+@keyframes loader-halo {
+  0% { transform: scale(0.92); opacity: 0.45; }
+  100% { transform: scale(1.18); opacity: 0; }
+}
+
+.portal-loader__label {
+  margin: 0;
+  color: var(--loader-label);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.portal-loader-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-loader .waves::before,
+  .portal-loader .waves::after,
+  .portal-loader .loader::after {
+    animation: none;
+  }
+}

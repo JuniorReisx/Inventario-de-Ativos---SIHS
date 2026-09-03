@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SIHS — Estado da Bahia</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <link
+      rel="stylesheet"
+      href="https://js.arcgis.com/4.32/esri/themes/light/main.css"
+    />
+    <script src="https://js.arcgis.com/4.32/"></script>
+    <link rel="stylesheet" href="./css/style.css" />
+  </head>
+  <body>
+    <div class="dashboard">
+      <!-- Faixa superior de indicadores -->
+      <header class="kpi-strip" id="kpiStrip" aria-label="Indicadores principais">
+        <!-- preenchido por JS -->
+      </header>
+
+      <main class="dashboard-main">
+        <!-- Painel do mapa -->
+        <section class="panel panel-map" aria-label="Estado da Bahia">
+          <div class="panel-accent"></div>
+          <header class="panel-head">
+            <div>
+              <p class="panel-eyebrow">Mapa interativo</p>
+              <h2 class="panel-title">ESTADO DA BAHIA</h2>
+            </div>
+          </header>
+          <div class="map-frame">
+            <div id="viewDiv"></div>
+            <div id="mapOverlay" class="map-overlay is-visible">
+              <div class="overlay-card">
+                <h3 id="overlayTitle">Carregando mapa</h3>
+                <p id="overlayMessage">Conectando ao ArcGIS Enterprise…</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Painel Bahia em Números -->
+        <section class="panel panel-stats" aria-label="Bahia em números">
+          <div class="panel-accent"></div>
+          <div class="stats-panel-head">
+            <header class="panel-head">
+              <div>
+                <p class="panel-eyebrow">Indicadores demográficos</p>
+                <h2 class="panel-title" id="statsPanelTitle">BAHIA EM NÚMEROS</h2>
+              </div>
+            </header>
+            <div id="filterBanner" class="filter-banner" hidden>
+              <span id="filterBannerText">Filtro ativo</span>
+              <button type="button" id="clearFilterBtn" class="filter-clear">
+                Limpar filtro
+              </button>
+            </div>
+          </div>
+
+          <div class="stats-layout">
+            <article
+              class="stat-card stat-card--large is-loading"
+              data-card-id="pop_total"
+              aria-busy="true"
+            >
+              <p class="stat-kicker">Destaque</p>
+              <p class="stat-label">População Total (2022)</p>
+              <p class="stat-value" data-role="value">—</p>
+              <p class="stat-meta" data-role="meta" hidden></p>
+            </article>
+
+            <div id="statsGrid" class="stats-grid" aria-live="polite">
+              <!-- cards menores preenchidos por JS -->
+            </div>
+          </div>
+
+          <div class="chart-block">
+            <div class="chart-head">
+              <h3 class="chart-title" id="chartTitle">Distribuição por População (2022)</h3>
+              <p class="chart-subtitle">População rural e urbana no recorte selecionado</p>
+            </div>
+            <div id="populationChart" class="population-chart" aria-live="polite">
+              <!-- barras preenchidas por JS -->
+            </div>
+            <div class="chart-legend" id="chartLegend"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- Popover ancorado abaixo do KPI clicado -->
+    <div
+      id="kpiPopup"
+      class="kpi-popover"
+      hidden
+      role="dialog"
+      aria-labelledby="kpiPopupTitle"
+    >
+      <div class="kpi-popover__arrow" aria-hidden="true"></div>
+      <header class="kpi-popover__header">
+        <h3 id="kpiPopupTitle">Indicador</h3>
+        <button type="button" class="kpi-popover__close" data-popup-close aria-label="Fechar">
+          ×
+        </button>
+      </header>
+      <div id="kpiPopupBody" class="kpi-popover__body">
+        <p class="kpi-popover__loading">Carregando…</p>
+      </div>
+    </div>
+
+    <script type="module" src="./js/app.js"></script>
+  </body>
+</html>

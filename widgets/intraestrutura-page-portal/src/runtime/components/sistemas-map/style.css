@@ -1,0 +1,563 @@
+.infra-sistemas {
+  --navy: #001824;
+  --navy-2: #002231;
+  --cyan: #1aa8c8;
+  --aqua: #2fc4ff;
+  --muted: #5d7380;
+  --line: rgba(183, 196, 207, 0.9);
+  --accent: #1aa8c8;
+  --accent-2: #2fc4ff;
+  --accent-ink: #0a5c66;
+  --accent-soft: rgba(47, 196, 255, 0.16);
+  --accent-glow: rgba(47, 196, 255, 0.28);
+  --accent-mid: rgba(26, 168, 200, 0.1);
+  --accent-faint: rgba(26, 168, 200, 0.06);
+  --accent-ring: rgba(47, 196, 255, 0.45);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0 0.65rem 0.85rem;
+}
+
+.infra-sistemas[data-theme="sistemas"] {
+  --accent: #1aa8c8;
+  --accent-2: #2fc4ff;
+  --accent-ink: #0a5c66;
+  --accent-soft: rgba(47, 196, 255, 0.16);
+  --accent-glow: rgba(47, 196, 255, 0.3);
+  --accent-mid: rgba(26, 168, 200, 0.1);
+  --accent-faint: rgba(26, 168, 200, 0.06);
+  --accent-ring: rgba(47, 196, 255, 0.5);
+}
+
+.infra-sistemas[data-theme="cisternas"] {
+  --accent: #1b5fa0;
+  --accent-2: #78bfe8;
+  --accent-ink: #0e3d6b;
+  --accent-soft: rgba(120, 191, 232, 0.2);
+  --accent-glow: rgba(27, 95, 160, 0.34);
+  --accent-mid: rgba(27, 95, 160, 0.1);
+  --accent-faint: rgba(27, 95, 160, 0.06);
+  --accent-ring: rgba(120, 191, 232, 0.5);
+}
+
+.infra-sistemas[data-theme="pocos"] {
+  --accent: #0a5c66;
+  --accent-2: #3db8c4;
+  --accent-ink: #063e45;
+  --accent-soft: rgba(61, 184, 196, 0.18);
+  --accent-glow: rgba(10, 92, 102, 0.36);
+  --accent-mid: rgba(10, 92, 102, 0.1);
+  --accent-faint: rgba(10, 92, 102, 0.06);
+  --accent-ring: rgba(61, 184, 196, 0.5);
+}
+
+.infra-sistemas__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  border-radius: 16px;
+  background:
+    radial-gradient(ellipse 72% 130% at 0% 0%, var(--accent-glow), transparent 62%),
+    linear-gradient(180deg, #001824 0%, #002231 100%);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.infra-sistemas__tabs {
+  display: inline-flex;
+  padding: 0.22rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.infra-sistemas__tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.42rem 0.85rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #9ec4d0;
+  font-family: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.infra-sistemas__tabs button i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.infra-sistemas__tabs button[data-theme="sistemas"] i { background: #2fc4ff; }
+.infra-sistemas__tabs button[data-theme="cisternas"] i { background: #78bfe8; }
+.infra-sistemas__tabs button[data-theme="pocos"] i { background: #3db8c4; }
+
+.infra-sistemas__tabs button:hover {
+  color: #e8f4f8;
+}
+
+.infra-sistemas__tabs button.is-active {
+  background: var(--accent-soft);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px var(--accent-ring);
+}
+
+.infra-sistemas__tabs button.is-active i {
+  opacity: 1;
+}
+
+.infra-sistemas__panel.is-idle {
+  position: absolute;
+  width: 100%;
+  height: 760px;
+  left: -120vw;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.infra-sistemas__eyebrow {
+  margin: 0 0 0.25rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+
+.infra-sistemas__title {
+  margin: 0;
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.infra-sistemas__note {
+  margin: 0.35rem 0 0;
+  max-width: 36rem;
+  color: #9fd4e0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.infra-sistemas__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 0.55rem 0.75rem;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 8px 22px rgba(0, 33, 59, 0.06);
+}
+
+.infra-sistemas__lead {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  max-width: min(420px, 48%);
+  color: #244354;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.infra-sistemas__lead em {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.infra-sistemas__lead span {
+  min-width: 0;
+}
+
+.infra-sistemas__lead strong {
+  display: block;
+  color: var(--navy);
+  font-size: 0.82rem;
+}
+
+.infra-sistemas__filters {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.infra-sistemas__filters > span {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.infra-sistemas__filters > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.infra-sistemas__filters button {
+  padding: 0.34rem 0.65rem;
+  border: 1px solid rgba(183, 196, 207, 0.95);
+  border-radius: 999px;
+  background: #f4f8fa;
+  color: #3a5360;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.infra-sistemas__filters button.is-on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.infra-sistemas__grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 0.7rem;
+  min-height: 640px;
+  height: 680px;
+}
+
+.infra-sistemas__rank {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgba(0, 33, 59, 0.08);
+}
+
+.infra-sistemas__rank > header {
+  padding: 0.9rem 1rem 0.8rem;
+  background:
+    radial-gradient(ellipse 70% 120% at 0% 0%, var(--accent-glow), transparent 62%),
+    linear-gradient(180deg, #001824 0%, #002231 100%);
+}
+
+.infra-sistemas__rank > header p {
+  margin: 0 0 0.2rem;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.58rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+
+.infra-sistemas__rank > header h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.infra-sistemas__rank > header small {
+  display: block;
+  margin-top: 0.35rem;
+  color: #9ec4d0;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.infra-sistemas__rank ol {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 0.5rem 0.55rem 0.65rem;
+  overflow: auto;
+  list-style: none;
+}
+
+.infra-sistemas__rank li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
+  padding: 0.44rem 0.4rem;
+  border-radius: 10px;
+}
+
+.infra-sistemas__rank li + li {
+  margin-top: 0.08rem;
+}
+
+.infra-sistemas__rank li.is-top-1 {
+  background: var(--accent-soft);
+}
+
+.infra-sistemas__rank li.is-top-2 {
+  background: var(--accent-mid);
+}
+
+.infra-sistemas__rank li.is-top-3 {
+  background: var(--accent-faint);
+}
+
+.infra-sistemas__rank em {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.infra-sistemas__rank li.is-top-1 em { color: var(--accent-ink); }
+.infra-sistemas__rank li.is-top-2 em { color: var(--accent); }
+.infra-sistemas__rank li.is-top-3 em { color: var(--accent); }
+
+.infra-sistemas__rank strong {
+  display: block;
+  overflow: hidden;
+  color: var(--navy);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.infra-sistemas__track {
+  display: block;
+  height: 6px;
+  margin-top: 0.28rem;
+  overflow: hidden;
+  background: #e8eef3;
+  border-radius: 999px;
+}
+
+.infra-sistemas__track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+
+.infra-sistemas__rank b {
+  color: var(--navy);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.infra-sistemas__empty {
+  display: flex !important;
+  grid-template-columns: none;
+  justify-content: center;
+  align-items: center;
+  min-height: 160px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-style: normal;
+}
+
+.infra-sistemas__source {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.55rem 0.85rem 0.7rem;
+  border-top: 1px solid rgba(209, 220, 228, 0.95);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+}
+
+.infra-sistemas__source > span:first-child {
+  width: 1.75rem;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), rgba(26, 168, 200, 0.15));
+  flex-shrink: 0;
+}
+
+.infra-sistemas__source strong {
+  color: var(--accent-ink);
+  font-weight: 800;
+}
+
+.infra-sistemas__map-wrap {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  background: #d7e2ea;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgba(0, 33, 59, 0.08);
+}
+
+.infra-sistemas__map-wrap .mun-popup {
+  z-index: 8;
+}
+
+.infra-sistemas__map-wrap::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 4;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  pointer-events: none;
+}
+
+.infra-sistemas__map {
+  position: absolute;
+  inset: 0;
+}
+
+.infra-sistemas__map .esri-view,
+.infra-sistemas__map .esri-view-root,
+.infra-sistemas__map .esri-view-surface,
+.infra-sistemas__map canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.infra-sistemas__map .esri-basemap-gallery {
+  max-height: min(380px, 58vh);
+}
+
+.infra-sistemas__legend-card {
+  position: absolute;
+  left: 0.7rem;
+  bottom: 2.1rem;
+  z-index: 3;
+  width: min(260px, calc(100% - 1.4rem));
+  overflow: hidden;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(183, 196, 207, 0.95);
+  box-shadow: 0 10px 28px rgba(0, 33, 59, 0.16);
+}
+
+.infra-sistemas__legend-card > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 0;
+  background:
+    radial-gradient(ellipse 70% 120% at 0% 0%, var(--accent-glow), transparent 62%),
+    linear-gradient(180deg, #001824 0%, #002231 100%);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.infra-sistemas__legend-card em {
+  font-style: normal;
+  color: var(--accent-2);
+}
+
+.infra-sistemas__legend {
+  max-height: 240px;
+  overflow: auto;
+  padding: 0.45rem 0.55rem 0.6rem;
+}
+
+.infra-sistemas__legend .esri-legend,
+.infra-sistemas__legend .esri-widget {
+  background: transparent;
+  box-shadow: none;
+}
+
+.infra-sistemas__legend .esri-legend__service-label {
+  display: none !important;
+}
+
+.infra-sistemas__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  background: rgba(232, 238, 243, 0.82);
+  pointer-events: none;
+}
+
+.infra-sistemas__overlay p {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  background: #fff;
+  color: #00213b;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+@media (max-width: 1100px) {
+  .infra-sistemas__head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .infra-sistemas__tabs {
+    flex-wrap: wrap;
+    border-radius: 16px;
+  }
+
+  .infra-sistemas__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .infra-sistemas__lead {
+    max-width: 100%;
+  }
+
+  .infra-sistemas__grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .infra-sistemas__rank {
+    max-height: 420px;
+  }
+
+  .infra-sistemas__map-wrap {
+    min-height: 460px;
+  }
+}

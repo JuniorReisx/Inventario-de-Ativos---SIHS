@@ -1,0 +1,509 @@
+@import url("https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700;800&display=swap");
+
+.atlas-map {
+  --navy: #001824;
+  --navy-2: #002231;
+  --cyan: #2fc4ff;
+  --aqua: #5ec8de;
+  --ink: #eef7fa;
+  --muted: #9fc2ce;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+  gap: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 560px;
+  font-family: "Source Sans 3", "Segoe UI", sans-serif;
+}
+
+.atlas-map:not(.is-open) {
+  grid-template-columns: 52px minmax(0, 1fr);
+}
+
+.atlas-map *,
+.atlas-map *::before,
+.atlas-map *::after {
+  box-sizing: border-box;
+}
+
+.atlas-map .esri-view,
+.atlas-map .esri-view *,
+.atlas-map .esri-ui,
+.atlas-map .esri-ui * {
+  box-sizing: content-box;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.atlas-map__panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(0, 34, 49, 0.96), rgba(0, 13, 20, 0.94));
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.atlas-map:not(.is-open) .atlas-map__panel-head small,
+.atlas-map:not(.is-open) .atlas-map__panel-head p,
+.atlas-map:not(.is-open) .atlas-map__tools,
+.atlas-map:not(.is-open) .atlas-map__list {
+  display: none;
+}
+
+.atlas-map:not(.is-open) .atlas-map__panel-head {
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 0.7rem 0.35rem;
+}
+
+.atlas-map__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 1.05rem 1rem 0.85rem;
+  border-bottom: 1px solid rgba(94, 200, 222, 0.12);
+}
+
+.atlas-map__row {
+  display: grid;
+  grid-template-columns: 22px 28px 12px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0.35rem;
+  padding: 0.58rem 0.55rem;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.atlas-map__row input {
+  appearance: none;
+  width: 28px;
+  height: 16px;
+  margin: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.atlas-map__row input::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s ease;
+}
+
+.atlas-map__row input:checked {
+  background: #2fc4ff;
+}
+
+.atlas-map__row input:checked::after {
+  transform: translateX(12px);
+}
+
+.atlas-map__row input:indeterminate {
+  background: #5ec8de;
+}
+
+.atlas-map__row input:indeterminate::after {
+  transform: translateX(6px);
+}
+
+.atlas-map__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--aqua);
+  box-shadow: 0 0 0 3px rgba(47, 196, 255, 0.16);
+}
+
+.atlas-map__row--limite .atlas-map__swatch { background: #f2d36b; }
+.atlas-map__row--semi .atlas-map__swatch { background: #ef9f4a; }
+.atlas-map__row--reserv .atlas-map__swatch { background: #3ec4e8; }
+.atlas-map__row--sistema .atlas-map__swatch { background: #4aa3ff; }
+.atlas-map__row--poco .atlas-map__swatch { background: #7ad3a0; }
+.atlas-map__row--setor .atlas-map__swatch { background: #c9a6ff; }
+.atlas-map__row--ti .atlas-map__swatch { background: #ff8fab; }
+
+.atlas-map__panel-head p {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--aqua);
+}
+
+.atlas-map__panel-head small {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.atlas-map__collapse {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.atlas-map__tools {
+  padding: 0 1rem 0.75rem;
+}
+
+.atlas-map__search {
+  display: block;
+  width: 100%;
+}
+
+.atlas-map__search input {
+  display: block;
+  width: 100%;
+  min-width: 100%;
+  height: 2.55rem;
+  padding: 0 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font: inherit;
+  font-size: 0.95rem;
+}
+
+.atlas-map__search input::placeholder {
+  color: rgba(159, 194, 206, 0.8);
+}
+
+.atlas-map__bulk {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+
+.atlas-map__bulk button {
+  flex: 1;
+  height: 1.9rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(47, 196, 255, 0.14);
+  color: #d7f4ff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.atlas-map__list {
+  margin: 0;
+  padding: 0 0.65rem 1rem;
+  list-style: none;
+  overflow: auto;
+  flex: 1;
+}
+
+.atlas-map__list ul {
+  margin: 0 0 0.15rem 0.85rem;
+  padding: 0 0 0.15rem 0.45rem;
+  list-style: none;
+  border-left: 1px solid rgba(94, 200, 222, 0.18);
+}
+
+.atlas-map__node {
+  margin: 0;
+}
+
+.atlas-map__row.is-group span {
+  font-weight: 750;
+  letter-spacing: 0.01em;
+}
+
+.atlas-map__row.is-group {
+  background: rgba(47, 196, 255, 0.05);
+}
+
+.atlas-map__twist {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #9fc2ce;
+  cursor: pointer;
+  position: relative;
+}
+
+.atlas-map__twist::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 4px;
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 6px solid currentColor;
+}
+
+.atlas-map__twist.is-open::before {
+  left: 3px;
+  top: 6px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid currentColor;
+  border-bottom: 0;
+}
+
+.atlas-map__twist.is-leaf::before {
+  display: none;
+}
+
+.atlas-map__row:hover {
+  background: rgba(47, 196, 255, 0.1);
+}
+
+.atlas-map__row span {
+  min-width: 0;
+  color: #f4fbfd;
+  font-size: 0.86rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.atlas-map__empty {
+  padding: 1rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.atlas-map__stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 0;
+  overflow: hidden;
+  background: #0b1c24;
+}
+
+.atlas-map__view {
+  width: 100%;
+  height: 100%;
+  min-height: 560px;
+}
+
+.atlas-map__export {
+  position: absolute;
+  bottom: 2.5rem;
+  right: 0.85rem;
+  z-index: 16;
+  height: 2.35rem;
+  padding: 0 0.95rem;
+  border: 0;
+  border-radius: 12px;
+  background: #0a7fa8;
+  color: #fff;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(0, 13, 20, 0.28);
+}
+
+.atlas-map__export:hover:not(:disabled) {
+  background: #0890be;
+}
+
+.atlas-map__export:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.atlas-map__legend .esri-legend__layer-caption {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #0a5c66;
+}
+
+.atlas-map__legend-card {
+  position: absolute;
+  left: 0.7rem;
+  bottom: 2.1rem;
+  z-index: 14;
+  width: min(260px, calc(100% - 1.4rem));
+  overflow: hidden;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid rgba(183, 196, 207, 0.95);
+  box-shadow: 0 10px 28px rgba(0, 33, 59, 0.16);
+}
+
+.atlas-map__legend-card > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 0;
+  background:
+    radial-gradient(ellipse 70% 120% at 0% 0%, rgba(47, 196, 255, 0.28), transparent 62%),
+    linear-gradient(180deg, #001824 0%, #002231 100%);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.atlas-map__legend-card em {
+  font-style: normal;
+  color: #2fc4ff;
+}
+
+.atlas-map__legend {
+  max-height: 240px;
+  overflow: auto;
+  padding: 0.45rem 0.55rem 0.6rem;
+}
+
+.atlas-map__legend .esri-legend,
+.atlas-map__legend .esri-widget {
+  background: transparent;
+  box-shadow: none;
+}
+
+.atlas-map__legend .esri-legend__service-label,
+.atlas-map__legend .esri-legend__layer-caption {
+  display: none !important;
+}
+
+.atlas-map__mun {
+  position: absolute;
+  top: 50%;
+  right: 0.7rem;
+  z-index: 15;
+  width: min(300px, calc(100% - 1.4rem));
+  transform: translateY(-50%);
+  padding: 0.85rem 0.9rem 0.95rem;
+  border: 1px solid #b7c4cf;
+  border-radius: 12px;
+  background: #fff;
+  color: #002231;
+  box-shadow: 0 12px 28px rgba(0, 33, 59, 0.18);
+}
+
+.atlas-map__mun-close {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  width: 1.65rem;
+  height: 1.65rem;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 33, 59, 0.08);
+  color: #002231;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.atlas-map__mun p {
+  margin: 0;
+  color: #0a5c66;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.atlas-map__mun h4 {
+  margin: 0.35rem 1.8rem 0.7rem 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.atlas-map__mun dl {
+  margin: 0;
+}
+
+.atlas-map__mun div {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.45rem 0;
+  border-top: 1px solid #e4eaee;
+}
+
+.atlas-map__mun dt {
+  color: #5d7380;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.atlas-map__mun dd {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.atlas-map .esri-ui-bottom-left .esri-legend {
+  display: none !important;
+}
+
+.atlas-map__error {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.92);
+  color: #002231;
+  font-weight: 700;
+  padding: 2rem;
+  text-align: center;
+}
+
+@media (max-width: 860px) {
+  .atlas-map,
+  .atlas-map:not(.is-open) {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(420px, 1fr);
+  }
+
+  .atlas-map__panel {
+    max-height: 46vh;
+  }
+
+  .atlas-map:not(.is-open) .atlas-map__panel {
+    max-height: 52px;
+  }
+}

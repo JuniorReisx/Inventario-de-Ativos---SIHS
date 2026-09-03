@@ -1,0 +1,6 @@
+[
+  {
+    "from": "js/pts-data.js",
+    "to": "dist/runtime/assets/pts-data.js"
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "name": "header-portal",
+  "label": "Header Portal da Água",
+  "type": "widget",
+  "version": "1.17.0",
+  "exbVersion": "1.17.0",
+  "author": "Your Name",
+  "description": "Header institucional do Portal da Água / Inventário Hídrico",
+  "copyright": "",
+  "license": "",
+  "properties": {
+    "cover": true
+  },
+  "translatedLocales": ["en"],
+  "defaultSize": {
+    "width": 1280,
+    "height": 76
+  }
+}

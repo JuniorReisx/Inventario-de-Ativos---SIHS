@@ -1,0 +1,45 @@
+@import url("https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap");
+
+.esgo-page {
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: #f0f0f0;
+  font-family: "Source Sans 3", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.esgo-page *,
+.esgo-page *::before,
+.esgo-page *::after {
+  box-sizing: border-box;
+}
+
+.esgo-page .esri-view,
+.esgo-page .esri-view *,
+.esgo-page .esri-ui,
+.esgo-page .esri-ui * {
+  box-sizing: content-box;
+}
+
+.esgo-page .esri-basemap-gallery {
+  max-height: min(420px, 62vh);
+}
+
+.esgo-page.jimu-widget {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.esgo-page__hero {
+  flex: 0 0 auto;
+  padding: 0.65rem 0.65rem 0;
+}
+
+.esgo-page__painel {
+  flex: 1 1 auto;
+  min-height: 0;
+}

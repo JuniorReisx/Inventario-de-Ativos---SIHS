@@ -1,0 +1,19 @@
+{
+  "name": "footer-portal",
+  "label": "Footer Portal da Água",
+  "type": "widget",
+  "version": "1.17.0",
+  "exbVersion": "1.17.0",
+  "author": "Your Name",
+  "description": "Footer institucional do Portal da Água / Inventário Hídrico",
+  "copyright": "",
+  "license": "",
+  "properties": {
+    "cover": true
+  },
+  "translatedLocales": ["en"],
+  "defaultSize": {
+    "width": 1280,
+    "height": 220
+  }
+}
