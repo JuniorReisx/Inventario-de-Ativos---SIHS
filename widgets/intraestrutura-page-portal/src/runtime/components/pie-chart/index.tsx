@@ -1,9 +1,9 @@
-import { React } from 'jimu-core'
+import { React, ReactDOM } from 'jimu-core'
 import { formatPopulation } from '../../lib/municipios'
 import { groupSmallChartSlices, type ChartSlice } from '../../lib/charts'
 import './style.css'
 
-const { useMemo, useState } = React
+const { useEffect, useMemo, useRef, useState } = React
 
 const PALETTES: Record<string, string[]> = {
   reservatorios: [
@@ -25,6 +25,15 @@ const UNITS: Record<string, [string, string]> = {
   sistemas: ['sistema geolocalizado', 'sistemas geolocalizados']
 }
 
+const CHART_TITLES: Record<string, string> = {
+  reservatorios: 'Reservatórios',
+  pocos: 'Poços',
+  sistemas: 'Sistemas'
+}
+
+const POPOVER_WIDTH = 320
+const POPOVER_GAP = 8
+
 type PieChartProps = {
   chartId: string
   items: ChartSlice[]
@@ -37,6 +46,12 @@ type SliceRow = ChartSlice & {
   percent: number
   start: number
   end: number
+}
+
+type PopoverPos = {
+  top: number
+  left: number
+  placement: 'bottom' | 'top'
 }
 
 function formatPercent (value: number): string {
@@ -65,10 +80,32 @@ function donutPath (cx: number, cy: number, rOuter: number, rInner: number, a0: 
   return `M ${x0o} ${y0o} A ${rOuter} ${rOuter} 0 ${large} 1 ${x1o} ${y1o} L ${x1i} ${y1i} A ${rInner} ${rInner} 0 ${large} 0 ${x0i} ${y0i} Z`
 }
 
+function placePopover (anchor: DOMRect, estimatedHeight = 280): PopoverPos {
+  const viewportW = window.innerWidth
+  const viewportH = window.innerHeight
+  let left = anchor.left
+  if (left + POPOVER_WIDTH > viewportW - 12) {
+    left = Math.max(12, anchor.right - POPOVER_WIDTH)
+  }
+  left = Math.max(12, left)
+
+  const below = anchor.bottom + POPOVER_GAP
+  const above = anchor.top - POPOVER_GAP - estimatedHeight
+  const fitsBelow = below + estimatedHeight <= viewportH - 12
+  if (fitsBelow || above < 12) {
+    return { top: below, left, placement: 'bottom' }
+  }
+  return { top: Math.max(12, above), left, placement: 'top' }
+}
+
 const PieChart = ({ chartId, items, preserveOrder = false }: PieChartProps) => {
   const colors = PALETTES[chartId] || DEFAULT_PALETTE
+  const rootRef = useRef<HTMLDivElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
+  const anchorRef = useRef<Element | null>(null)
   const [activeLabel, setActiveLabel] = useState<string | null>(null)
   const [openOutros, setOpenOutros] = useState(false)
+  const [popoverPos, setPopoverPos] = useState<PopoverPos | null>(null)
 
   const grouped = useMemo(
     () => preserveOrder
@@ -98,6 +135,62 @@ const PieChart = ({ chartId, items, preserveOrder = false }: PieChartProps) => {
   const active = rows.find((row) => row.label === activeLabel) || null
   const outros = rows.find((row) => row.label === 'Outros' && row.parts?.length) || null
 
+  const syncPopover = () => {
+    const anchor = anchorRef.current
+    if (!anchor) return
+    const height = popoverRef.current?.offsetHeight || 280
+    setPopoverPos(placePopover(anchor.getBoundingClientRect(), height))
+  }
+
+  const closeOutrosPopup = () => {
+    anchorRef.current = null
+    setOpenOutros(false)
+    setPopoverPos(null)
+  }
+
+  const openOutrosPopup = (event: React.SyntheticEvent) => {
+    event.stopPropagation()
+    const target = event.currentTarget as Element
+    if (openOutros && anchorRef.current === target) {
+      closeOutrosPopup()
+      return
+    }
+    anchorRef.current = target
+    setPopoverPos(placePopover(target.getBoundingClientRect()))
+    setOpenOutros(true)
+  }
+
+  useEffect(() => {
+    setOpenOutros(false)
+    setPopoverPos(null)
+    anchorRef.current = null
+  }, [items, chartId])
+
+  useEffect(() => {
+    if (!openOutros) return
+    syncPopover()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeOutrosPopup()
+    }
+    const onDocClick = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (popoverRef.current?.contains(target)) return
+      if (anchorRef.current?.contains(target)) return
+      closeOutrosPopup()
+    }
+    const onReposition = () => syncPopover()
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('mousedown', onDocClick)
+    window.addEventListener('resize', onReposition)
+    document.addEventListener('scroll', onReposition, true)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('mousedown', onDocClick)
+      window.removeEventListener('resize', onReposition)
+      document.removeEventListener('scroll', onReposition, true)
+    }
+  }, [openOutros])
+
   if (!rows.length) {
     return <p className="infra-bars__empty">Sem dados</p>
   }
@@ -113,8 +206,56 @@ const PieChart = ({ chartId, items, preserveOrder = false }: PieChartProps) => {
   const centerValue = active ? active.total : total
   const centerPct = active ? formatPercent(active.percent) : null
 
+  const outrosPopup = outros && openOutros && popoverPos
+    ? ReactDOM.createPortal(
+      (
+        <div
+          ref={popoverRef}
+          className={`infra-pie__outros-popover is-${popoverPos.placement}`}
+          role="dialog"
+          aria-labelledby={`infra-outros-title-${chartId}`}
+          style={{ top: popoverPos.top, left: popoverPos.left }}
+        >
+          <header className="infra-pie__outros-head">
+            <div>
+              <p>{CHART_TITLES[chartId] || 'Indicador'}</p>
+              <h4 id={`infra-outros-title-${chartId}`}>Composição de Outros</h4>
+            </div>
+            <button
+              type="button"
+              className="infra-pie__outros-close"
+              aria-label="Fechar"
+              onClick={closeOutrosPopup}
+            >
+              ×
+            </button>
+          </header>
+          <p className="infra-pie__outros-meta">
+            {formatPopulation(outros.total)} {unitFor(chartId, outros.total)} agrupados em {outros.parts!.length} categorias
+          </p>
+          <ul>
+            {outros.parts!.map((part) => {
+              const percent = total > 0 ? (part.total / total) * 100 : 0
+              return (
+                <li key={part.label}>
+                  <span>
+                    {part.label}
+                    {part.detail ? <small>{part.detail}</small> : null}
+                  </span>
+                  <b>{formatPopulation(part.total)}</b>
+                  <em>{formatPercent(percent)}</em>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ),
+      document.body
+    )
+    : null
+
   return (
-    <div className="infra-bars infra-bars--pie">
+    <div className="infra-bars infra-bars--pie" ref={rootRef}>
       <div className="infra-pie">
         <div
           className="infra-pie__viz"
@@ -137,8 +278,8 @@ const PieChart = ({ chartId, items, preserveOrder = false }: PieChartProps) => {
                   className={activeLabel && activeLabel !== slice.label ? 'is-dim' : activeLabel === slice.label ? 'is-hot' : ''}
                   onMouseEnter={() => setActiveLabel(slice.label)}
                   onFocus={() => setActiveLabel(slice.label)}
-                  onClick={() => {
-                    if (slice.parts?.length) setOpenOutros((value) => !value)
+                  onClick={(event) => {
+                    if (slice.parts?.length) openOutrosPopup(event)
                   }}
                   tabIndex={0}
                 >
@@ -165,9 +306,9 @@ const PieChart = ({ chartId, items, preserveOrder = false }: PieChartProps) => {
             >
               <button
                 type="button"
-                onClick={() => {
+                onClick={(event) => {
                   setActiveLabel(row.label)
-                  if (row.parts?.length) setOpenOutros((value) => !value)
+                  if (row.parts?.length) openOutrosPopup(event)
                 }}
               >
                 <i style={{ background: row.color }} />
@@ -183,38 +324,18 @@ const PieChart = ({ chartId, items, preserveOrder = false }: PieChartProps) => {
         </ul>
       </div>
 
-      {outros && openOutros
+      {outros
         ? (
-          <div className="infra-pie__outros">
-            <p>Composição de Outros</p>
-            <ul>
-              {outros.parts!.map((part) => {
-                const percent = total > 0 ? (part.total / total) * 100 : 0
-                return (
-                  <li key={part.label}>
-                    <span>
-                      {part.label}
-                      {part.detail ? <small>{part.detail}</small> : null}
-                    </span>
-                    <b>{formatPopulation(part.total)}</b>
-                    <em>{formatPercent(percent)}</em>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
+          <button
+            type="button"
+            className="infra-pie__outros-toggle"
+            onClick={openOutrosPopup}
+          >
+            Ver {outros.parts!.length} categorias em Outros
+          </button>
           )
-        : outros
-          ? (
-            <button
-              type="button"
-              className="infra-pie__outros-toggle"
-              onClick={() => setOpenOutros(true)}
-            >
-              Ver {outros.parts!.length} categorias em Outros
-            </button>
-            )
-          : null}
+        : null}
+      {outrosPopup}
     </div>
   )
 }
