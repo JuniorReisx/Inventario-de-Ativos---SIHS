@@ -55,7 +55,7 @@ export const SETOR_POPUP_FIELDS: PopupFieldSpec[] = [
   { label: 'Tipo de SC', candidates: ['tipo_sc', 'nm_tipo', 'tipo_setor', 'tipo'] },
   { label: 'Área', candidates: ['area', 'area_km2', 'ar_km2', 'a_km2'] },
   { label: 'Distrito', candidates: ['distrito', 'nm_dist', 'nm_distrito'] },
-  { label: 'População', candidates: ['estimativa_pop_2025', 'pop_est_2025', 'pop_2025', 'populacao', 'pop', 'total', 'v0001', 'pessoas'] },
+  { label: 'População', candidates: ['estimativa_pop_2026', 'pop_est_2026', 'populacao_estimada_2026', 'populacao_estimada', 'estimativa_pop_2025', 'pop_est_2025', 'pop_2025', 'populacao', 'pop', 'total', 'v0001', 'pessoas'] },
   { label: 'População indígena', candidates: ['pessoa_indigena', 'pop_indigena', 'indigena'] },
   { label: 'População quilombola', candidates: ['pessoa_quilombola', 'pop_quilombola', 'quilombola'] },
   { label: 'Total de domicílios', candidates: ['domicilios', 'total_domicilios', 'tot_dom', 'domicilios_recenseados', 'v0005'] }

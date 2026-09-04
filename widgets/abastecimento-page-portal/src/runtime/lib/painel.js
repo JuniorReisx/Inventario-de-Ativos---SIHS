@@ -191,22 +191,6 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     return !state.selectedMun && state.regiao === 'todas' && !state.semiOn;
   }
   
-  /** Diferença clara: "11,6 abaixo da Bahia" / "do território" (sem "p.p."). */
-  function fmtDeltaVs(pp, ref){
-    const fem = ref === 'Bahia';
-    const art = fem ? 'da' : 'do';
-    const artEq = fem ? 'à' : 'ao';
-    if(Math.abs(pp) < 0.05) return `igual ${artEq} ${ref}`;
-    if(pp > 0) return `${fmt1(pp)} acima ${art} ${ref}`;
-    return `${fmt1(Math.abs(pp))} abaixo ${art} ${ref}`;
-  }
-  
-  function deltaClass(pp, higherIsBetter){
-    if(Math.abs(pp) < 0.05) return 'neu';
-    const better = higherIsBetter ? pp > 0 : pp < 0;
-    return better ? 'up' : 'down';
-  }
-  
   function infoTip(text){
     return `<button type="button" class="info-tip" aria-label="Como foi pensado este indicador">
       <span class="info-tip-btn" aria-hidden="true">?</span>
@@ -253,9 +237,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     const shareDomTi = terr?.v?.aa_total ? (v.aa_total||0)/terr.v.aa_total*100 : null;
     const sharePopTi = terr?.pop ? pop/terr.pop*100 : null;
   
-    const cell = (titulo, sel, ti, ba, betterHigher) => {
-      const dBa = sel - ba;
-      const dTi = ti==null ? null : sel - ti;
+    const cell = (titulo, sel, ti, ba) => {
       return `
       <div class="cmp-cell">
         <div class="cmp-cell-lbl">${titulo}</div>
@@ -263,10 +245,6 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
           <div><span class="cmp-k">Seleção</span><span class="cmp-n">${fmt1(sel)}%</span></div>
           ${ti!=null?`<div><span class="cmp-k">Território</span><span class="cmp-n muted">${fmt1(ti)}%</span></div>`:''}
           <div><span class="cmp-k">Bahia</span><span class="cmp-n muted">${fmt1(ba)}%</span></div>
-        </div>
-        <div class="cmp-deltas">
-          ${dTi!=null?`<div class="cmp-delta ${deltaClass(dTi, betterHigher)}">${fmtDeltaVs(dTi, 'território')}</div>`:''}
-          <div class="cmp-delta ${deltaClass(dBa, betterHigher)}">${fmtDeltaVs(dBa, 'Bahia')}</div>
         </div>
       </div>`;
     };
@@ -282,9 +260,9 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
           <div class="cmp-share"><strong>${fmt(feats.length)}</strong><span>de ${fmt(GEO.features.length)} municípios</span></div>
         </div>
         <div class="cmp-grid ${terr?'has-ti':''}">
-          ${cell('Atendimento adequado', cl.pctAdeq, terr?terr.cl.pctAdeq:null, bahiaCl.pctAdeq, true)}
-          ${cell('Inadequado', cl.pctInadeq, terr?terr.cl.pctInadeq:null, bahiaCl.pctInadeq, false)}
-          ${cell(semLabel, cl.pctSem, terr?terr.cl.pctSem:null, bahiaCl.pctSem, false)}
+          ${cell('Atendimento adequado', cl.pctAdeq, terr?terr.cl.pctAdeq:null, bahiaCl.pctAdeq)}
+          ${cell('Inadequado', cl.pctInadeq, terr?terr.cl.pctInadeq:null, bahiaCl.pctInadeq)}
+          ${cell(semLabel, cl.pctSem, terr?terr.cl.pctSem:null, bahiaCl.pctSem)}
         </div>
       </div>`;
   }
@@ -570,12 +548,6 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
       mapApi.sync(state);
       return;
     }
-
-    const legendHtml = [['100% adequado',0],['75%',25],['50%',50],['25%',75],['0% adequado',100]].map(([lbl,v])=>
-      `<span><span class="sw" style="background:${colorForPct(v)}"></span>${lbl}</span>`).join('') +
-      `<span><span class="sw" style="background:${MUN_FILL_NEUTRAL}"></span>Sem dado</span>`;
-    const legendSlot = qs('#view-'+state.tab+' .legend-slot');
-    if(legendSlot) legendSlot.innerHTML = legendHtml;
 
     mountMapInActiveTab();
   
@@ -892,43 +864,26 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     const bahiaV = sumAa(GEO.features);
     const bahiaCl = classifyAa(bahiaV);
     const terr = getTerritorioContext();
-    const vsBa = !isFullState();
-    const bahiaCom = Math.max(0, (bahiaV.aa_total||0) - (bahiaV.aa_sem_rede||0));
-    const bahiaOutra = Math.max(0, bahiaCom - (bahiaV.aa_rede||0));
-    const bahiaPctRede = bahiaV.aa_total ? (bahiaV.aa_rede||0)/bahiaV.aa_total*100 : 0;
-    const bahiaPctOutra = bahiaV.aa_total ? bahiaOutra/bahiaV.aa_total*100 : 0;
-    const terrCom = terr ? Math.max(0, (terr.v.aa_total||0) - (terr.v.aa_sem_rede||0)) : 0;
-    const terrOutra = terr ? Math.max(0, terrCom - (terr.v.aa_rede||0)) : 0;
-    const terrPctRede = terr && terr.v.aa_total ? (terr.v.aa_rede||0)/terr.v.aa_total*100 : null;
-    const terrPctOutra = terr && terr.v.aa_total ? terrOutra/terr.v.aa_total*100 : null;
-    const dRedeBa = pctRede - bahiaPctRede;
-    const dRedeTi = terrPctRede != null ? pctRede - terrPctRede : null;
-    const dOutraBa = pctOutra - bahiaPctOutra;
-    const dOutraTi = terrPctOutra != null ? pctOutra - terrPctOutra : null;
   
     const kpiRow = qs('#'+'kpiRow-agua');
     if (kpiRow) kpiRow.innerHTML = `
       <div class="kpi">${infoTip('Quantidade de municípios incluídos no filtro ou município atualmente selecionado.')}
         <div class="val">${fmt(feats.length)}</div><div class="lbl">Municípios na seleção</div></div>
-      <div class="kpi">${infoTip('População estimada IBGE 2025 somada dos municípios da seleção.')}
-        <div class="val">${fmt(pop)}</div><div class="lbl">População (estimativa 2025)</div></div>
+      <div class="kpi">${infoTip('População estimada IBGE 2026 somada dos municípios da seleção.')}
+        <div class="val">${fmt(pop)}</div><div class="lbl">População (estimativa 2026)</div></div>
       <div class="kpi">${infoTip('Total de domicílios particulares permanentes recenseados no recorte (Censo IBGE 2022 · DPA Indicadores: total_domicílios_recenseados / dom_rec_2022).')}
         <div class="val">${fmt(totalDomicilios(v))}</div><div class="lbl">Total de domicílios</div></div>
       <div class="kpi bom">${infoTip('Domicílios que possuem ligação à rede geral de distribuição (SIDRA): total menos a categoria “não possui ligação à rede geral”.')}
         <div class="val">${fmt(comForma)}</div><div class="sub">${fmt1(pctCom)}%</div><div class="lbl">Possui ligação à rede geral</div></div>
       <div class="kpi alerta">${infoTip('Domicílios sem ligação à rede geral de distribuição, conforme SIDRA/Censo 2022.')}
         <div class="val">${fmt(v.aa_sem_rede)}</div><div class="sub">${fmt1(pctSem)}%</div><div class="lbl">Sem ligação à rede geral</div></div>
-      <div class="kpi bom">${infoTip('Domicílios cuja forma principal de abastecimento é a rede geral de distribuição (SIDRA / Censo 2022, campo de ligação à rede geral). “Acima/abaixo da Bahia (ou do território)” compara esse percentual com o recorte.')}
+      <div class="kpi bom">${infoTip('Domicílios cuja forma principal de abastecimento é a rede geral de distribuição (SIDRA / Censo 2022, campo de ligação à rede geral).')}
         <div class="val">${fmt(v.aa_rede)}</div>
         <div class="sub">${fmt1(pctRede)}%</div>
-        ${vsBa?`<div class="sub vs-ba-kpi ${deltaClass(dRedeBa,true)}">${fmtDeltaVs(dRedeBa, 'Bahia')}</div>`:''}
-        ${dRedeTi!=null?`<div class="sub vs-ba-kpi ${deltaClass(dRedeTi,true)}">${fmtDeltaVs(dRedeTi, 'território')}</div>`:''}
         <div class="lbl">Possui ligação à rede geral e a utiliza como forma principal</div></div>
       <div class="kpi">${infoTip('Domicílios com ligação à rede geral que, no entanto, declaram outra forma como principal (SIDRA): quem possui ligação menos quem usa a rede como forma principal.')}
         <div class="val">${fmt(outraForma)}</div>
         <div class="sub">${fmt1(pctOutra)}%</div>
-        ${vsBa?`<div class="sub vs-ba-kpi ${deltaClass(dOutraBa,false)}">${fmtDeltaVs(dOutraBa, 'Bahia')}</div>`:''}
-        ${dOutraTi!=null?`<div class="sub vs-ba-kpi ${deltaClass(dOutraTi,false)}">${fmtDeltaVs(dOutraTi, 'território')}</div>`:''}
         <div class="lbl">Possui ligação à rede geral, mas utiliza principalmente outra forma</div></div>
     `;
   
@@ -965,8 +920,11 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     const meta = [p.territorio, p.semiarido==='SIM' ? 'Semiárido' : null].filter(Boolean).join(' · ');
     qs('#'+'muniDetailBody').innerHTML = `
       <p class="muni-detail-meta" title="${meta}">${meta}</p>
+      <div class="embasa-status is-${embasa.kind}" role="status">
+        <span class="embasa-status__brand">Embasa</span>
+        <strong class="embasa-status__value">${embasa.label}</strong>
+      </div>
       <div class="detail-grid">
-        <div class="detail-item is-embasa is-${embasa.kind}"><div class="v text">${embasa.label}</div><div class="l">Atendido pela Embasa</div></div>
         <div class="detail-item"><div class="v">${fmt(p.populacao)}</div><div class="l">População</div></div>
         <div class="detail-item"><div class="v">${fmt(p.aa_total)}</div><div class="l">Domicílios</div></div>
         <div class="detail-item wide"><div class="v text">${p.territorio}</div><div class="l">Território de Identidade</div></div>
@@ -1117,6 +1075,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
       const rPct = setorTot ? rurTot/setorTot*100 : 0;
       const pctIn = (part, tot) => tot ? fmt1(part/tot*100)+'% da área' : '—';
       const mapDataUrl = mapApi && typeof mapApi.capture === 'function' ? await mapApi.capture(state) : null;
+      const mapLegend = mapApi && typeof mapApi.captureLegend === 'function' ? await mapApi.captureLegend() : [];
       const formaBars = AA_COMP_CATS.map(c=>{
         const val = v[c.key]||0;
         return {
@@ -1134,7 +1093,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
         fileName: `relatorio-abastecimento-${slugRelatorio(currentSelectionLabel())}.pdf`,
         kpis: [
           { label: 'Municípios na seleção', value: fmt(feats.length) },
-          { label: 'População (estimativa 2025)', value: fmt(pop) },
+          { label: 'População (estimativa 2026)', value: fmt(pop) },
           { label: 'Total de domicílios', value: fmt(totalDomicilios(v)) },
           { label: 'Possui ligação à rede geral', value: fmt(comForma), sub: fmt1(pctCom)+'%' },
           { label: 'Sem ligação à rede geral', value: fmt(v.aa_sem_rede), sub: fmt1(pctSem)+'%' },
@@ -1151,6 +1110,9 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
         },
         mapCaption: currentSelectionLabel(),
         mapDataUrl,
+        mapLegendTitle: 'Legenda do mapa',
+        mapLegendNote: 'Símbolos e cores iguais aos da legenda do mapa na tela.',
+        mapLegend,
         sections: [
           {
             title: '1. Domicílios por forma de abastecimento (dado municipal)',
@@ -1191,7 +1153,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
               headers: ['Indicador', 'Fonte'],
               colWeights: [1.15, 2.35],
               rows: [
-                ['População', 'Estimativa IBGE 2025 · DPA Indicadores (estimativa_pop_2025)'],
+                ['População', 'Estimativa IBGE 2026 · DPA Indicadores (população estimada)'],
                 ['Total de domicílios', 'Censo IBGE 2022 · DPA Indicadores (total_domicílios_recenseados / dom_rec_2022)'],
                 ['Municípios na seleção', 'Contagem do recorte no mapa · DPA_Indicadores_Censo_2022'],
                 ['Rede, poço profundo, poço raso, fonte, pipa, chuva, rio e outra forma', 'SIDRA tabela 6803 · Censo IBGE 2022 · DPA Indicadores (campos aa_*)'],

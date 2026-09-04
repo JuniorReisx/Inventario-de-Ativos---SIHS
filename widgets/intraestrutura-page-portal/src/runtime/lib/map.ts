@@ -700,7 +700,7 @@ export async function buildMunicipioPopupData (
     name: [resolved.name, 'nome_do_municipio', 'nm_mun_1', 'nm_mun', 'municipio', 'nome', 'nome_municipio', 'nm_municipio', 'nom_municipio'],
     territory: [resolved.territory, 'territorio_de_indentidade', 'territorio_de_identidade', 'nm_territorio_identidade', 'nm_ti', 'territorio'],
     semiarido: [resolved.semiarido, 'região_do_semiarida', 'regiao_do_semiarida', 'semiarido'],
-    population: [resolved.population, 'estimativa_pop_2025', 'pop_est_2025', 'populacao_estimada_2025', 'pop_2025', 'população__2022_', 'populacao__2022_', 'pop_2022', 'populacao_estimada', 'populacao', 'total_1'],
+    population: [resolved.population, 'estimativa_pop_2026', 'pop_est_2026', 'populacao_estimada_2026', 'pop_2026', 'populacao_estimada', 'estimativa_pop_2025', 'pop_est_2025', 'populacao_estimada_2025', 'pop_2025', 'população__2022_', 'populacao__2022_', 'pop_2022', 'populacao', 'total_1'],
     codibge: ['codigo_do_municipio', 'codibge', 'cd_ibge', 'ibge_codigo', 'cd_mun', 'cod_mun', 'geocodigo_ibge', 'codigo_ibge', 'geocodigo_municipio']
   }
 
@@ -879,12 +879,17 @@ export function positionMunicipioPopup (
 }
 
 const POP_FIELD_CANDIDATES = [
+  'estimativa_pop_2026',
+  'pop_est_2026',
+  'estimativa_pop2026',
+  'populacao_estimada_2026',
+  'pop_2026',
+  'populacao_estimada',
   'estimativa_pop_2025',
   'pop_est_2025',
   'estimativa_pop2025',
   'populacao_estimada_2025',
   'pop_2025',
-  'populacao_estimada',
   'população__2022_',
   'populacao__2022_',
   'populacao_2022',
@@ -924,7 +929,7 @@ function populationFromAttrs (attrs: Record<string, any>, fields: any[]): number
     const blob = normalizeMunText(`${name} ${alias}`)
     if (isCountLikeField(name) || isCountLikeField(alias)) continue
     if (!(blob.includes('populac') || blob.includes('habitantes') || blob.includes('pop'))) continue
-    if (blob.includes('2025') || blob.includes('estimativ')) {
+    if (blob.includes('2026') || blob.includes('2025') || blob.includes('estimativ')) {
       const parsed = parsePopulation(a[name] ?? byKey.get(normalizeMunKey(name)))
       if (parsed != null) return parsed
     }
@@ -952,7 +957,7 @@ async function resolveCensusLayer (webMap?: any): Promise<any | null> {
       const fields = layer?.fields || []
       const hasPop = fields.some((field: any) => {
         const blob = `${field?.name || ''} ${field?.alias || ''}`
-        return /populacao__2022|população__2022|estimativa_pop_2025|pop_2022/i.test(blob)
+        return /populacao__2022|população__2022|estimativa_pop_2026|estimativa_pop_2025|pop_est_2026|pop_2022/i.test(blob)
       })
       if (hasPop) return layer
     }

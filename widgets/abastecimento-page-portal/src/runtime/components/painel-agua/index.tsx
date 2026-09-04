@@ -261,10 +261,6 @@ const PainelAgua = ({ folderUrl }: { folderUrl: string }) => {
                   <div className="abas-map-view" ref={mapRef} />
                   <div className="map-hint" role="tooltip" aria-hidden="true"></div>
                 </div>
-                <div className="legend legend-slot"></div>
-                <div className="legend-note">
-                  Azul escuro = 100% dos domicílios com abastecimento adequado (rede, poço profundo ou poço raso). Azul claro = 100% inadequado ou sem ligação à rede geral.
-                </div>
               </div>
             </div>
 

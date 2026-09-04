@@ -823,9 +823,11 @@ export async function buildMunicipioPopupData (
     'pertence_semiarido', 'regiao_semiarida'
   ]
   const popCandidates = [
+    'estimativa_pop_2026', 'pop_est_2026', 'estimativa_pop2026',
+    'populacao_estimada_2026', 'pop_2026', 'pop_est_2026',
+    'populacao_estimada', 'pop_estimada', 'populacao estimada',
     'estimativa_pop_2025', 'pop_est_2025', 'estimativa_pop2025',
-    'populacao_estimada_2025', 'pop_2025', 'pop_est_2025',
-    'populacao_estimada', 'pop_estimada',
+    'populacao_estimada_2025', 'pop_2025',
     'populacao__2022_', 'população__2022_', 'populacao_2022', 'população_2022',
     'pop_2022', 'populacao', 'populacao_total',
     'total_1', 'pop', 'habitantes'
@@ -841,7 +843,8 @@ export async function buildMunicipioPopupData (
   const nameField = pickAttrKey(nameCandidates) ?? resolveMunField(fields, nameCandidates, 'nome_do_municipio')
   const tiField = pickAttrKey(tiCandidates) ?? resolveMunField(fields, tiCandidates, 'territorio_de_indentidade')
   const semiField = pickAttrKey(semiCandidates) ?? resolveMunField(fields, semiCandidates, 'região_do_semiarida')
-  const popField = pickAttrKey(popCandidates) ?? resolveMunField(fields, popCandidates, 'estimativa_pop_2025')
+  const popField = pickAttrKey(['pop_est_2026', ...popCandidates]) ||
+    resolveMunField(fields, ['pop_est_2026', ...popCandidates], 'pop_est_2026')
   const codField = pickAttrKey(codCandidates) ?? resolveMunField(fields, codCandidates, 'codibge')
 
   const getAttr = (field: string): any => a[field] ?? a[field?.toLowerCase?.() ?? '']

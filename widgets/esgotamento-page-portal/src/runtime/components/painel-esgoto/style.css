@@ -430,40 +430,22 @@
 @media (max-width: 1100px) { .esgo-painel .kpis{ grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 700px) { .esgo-painel .kpis{ grid-template-columns: repeat(2, 1fr); } }
 
-/* ── KPIs em bento: 1º cartão vira destaque grande, os 4 seguintes formam
-     um bloco 2x2 compacto ao lado. Puramente estrutural — os cartões em si
-     continuam sendo os mesmos elementos .kpi gerados pelo painel.js. ── */
+/* ── KPIs em bento: grade igual à de abastecimento (7 cartões no mesmo tamanho). ── */
 .esgo-painel .kpis-bento{
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   grid-auto-rows: minmax(84px, auto);
 }
 
-.esgo-painel .kpis-bento .kpi:nth-child(1){
-  grid-column: span 2;
-  grid-row: span 2;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+@media (max-width: 1200px) {
+  .esgo-painel .kpis-bento{ grid-template-columns: repeat(3, 1fr); }
 }
 
-.esgo-painel .kpis-bento .kpi:nth-child(1) .val{ font-size: 43px; }
-.esgo-painel .kpis-bento .kpi:nth-child(1) .lbl{ font-size: 13px; }
-
-.esgo-painel .kpis-bento .kpi:nth-child(2){ grid-column: span 2; grid-row: 1; }
-.esgo-painel .kpis-bento .kpi:nth-child(3){ grid-column: span 2; grid-row: 1; }
-.esgo-painel .kpis-bento .kpi:nth-child(4){ grid-column: span 2; grid-row: 2; }
-.esgo-painel .kpis-bento .kpi:nth-child(5){ grid-column: span 2; grid-row: 2; }
-
-@media (max-width: 1100px) {
-  .esgo-painel .kpis-bento{ grid-template-columns: repeat(4, 1fr); }
-  .esgo-painel .kpis-bento .kpi:nth-child(1){ grid-column: span 4; grid-row: span 1; flex-direction: row; justify-content: space-between; align-items: center; }
-  .esgo-painel .kpis-bento .kpi:nth-child(2), .esgo-painel .kpis-bento .kpi:nth-child(3), .esgo-painel .kpis-bento .kpi:nth-child(4), .esgo-painel .kpis-bento .kpi:nth-child(5){ grid-column: span 2; grid-row: auto; }
+@media (max-width: 900px) {
+  .esgo-painel .kpis-bento{ grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 700px) {
-  .esgo-painel .kpis-bento{ grid-template-columns: repeat(2, 1fr); }
-  .esgo-painel .kpis-bento .kpi:nth-child(1){ grid-column: span 2; }
-  .esgo-painel .kpis-bento .kpi:nth-child(2), .esgo-painel .kpis-bento .kpi:nth-child(3), .esgo-painel .kpis-bento .kpi:nth-child(4), .esgo-painel .kpis-bento .kpi:nth-child(5){ grid-column: span 1; }
+  .esgo-painel .kpis-bento{ grid-template-columns: 1fr; }
 }
 
 .esgo-painel .kpis-compare{
@@ -1241,6 +1223,52 @@
   color: var(--texto-medio);
   line-height: 1.35;
   overflow-wrap: anywhere;
+}
+
+.esgo-painel .embasa-status{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  min-width: 0;
+}
+
+.esgo-painel .embasa-status__brand{
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.esgo-painel .embasa-status__value{
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.esgo-painel .embasa-status.is-yes{
+  background: #e7f6ee;
+  border-color: #b6dfc6;
+  color: #0d6b4d;
+}
+
+.esgo-painel .embasa-status.is-no{
+  background: #f8ece8;
+  border-color: #e4c4b8;
+  color: #8a3b2a;
+}
+
+.esgo-painel .embasa-status.is-unknown{
+  background: #eef2f4;
+  border-color: #d5dee3;
+  color: #5b6b75;
 }
 
 .esgo-painel .detail-grid{

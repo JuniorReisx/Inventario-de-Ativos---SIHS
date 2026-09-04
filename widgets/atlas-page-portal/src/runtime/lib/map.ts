@@ -219,6 +219,45 @@ export function pruneAtlasLegendDom (container: HTMLElement | null): void {
   })
 }
 
+function colorFromLegendSymbol (el: HTMLElement | null): string {
+  if (!el) return '#5b6b75'
+  const filled = el.querySelector('[fill]') as SVGElement | null
+  const fill = filled?.getAttribute('fill') || ''
+  if (fill && fill !== 'none' && !fill.startsWith('url(')) return fill
+  const styled = el.querySelector('[style*="background"], [style*="fill"]') as HTMLElement | null
+  const styleText = styled?.getAttribute('style') || el.getAttribute('style') || ''
+  const painted = styleText.match(/rgba?\([^)]+\)|#([0-9a-fA-F]{3,8})/i)
+  if (painted) return painted[0]
+  const nodes = [el, ...Array.from(el.querySelectorAll('*'))] as HTMLElement[]
+  for (const node of nodes) {
+    const bg = window.getComputedStyle(node).backgroundColor
+    if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return bg
+  }
+  return '#5b6b75'
+}
+
+export function atlasLegendForPdf (container: HTMLElement | null): Array<{
+  title?: string
+  items: Array<{ label: string, color: string }>
+}> {
+  if (!container) return []
+  pruneAtlasLegendDom(container)
+  const items: Array<{ label: string, color: string }> = []
+  const seen = new Set<string>()
+  container.querySelectorAll('.esri-legend__layer-row').forEach((node) => {
+    const row = node as HTMLElement
+    if (row.style.display === 'none') return
+    const info = row.querySelector('.esri-legend__layer-cell--info') as HTMLElement | null
+    const label = cleanLegendLabel(info?.textContent || row.textContent || '')
+    if (!label || seen.has(label)) return
+    seen.add(label)
+    const symbol = row.querySelector('.esri-legend__layer-cell--symbols') as HTMLElement | null
+    items.push({ label, color: colorFromLegendSymbol(symbol) })
+  })
+  if (!items.length) return []
+  return [{ title: 'Camadas visíveis', items }]
+}
+
 export function atlasSyncLegend (legend: any, webMap: any): void {
   if (!legend) return
   try {

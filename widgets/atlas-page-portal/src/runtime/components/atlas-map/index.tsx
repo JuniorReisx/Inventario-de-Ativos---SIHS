@@ -20,7 +20,7 @@ import {
   type AtlasLayerNode,
   type AtlasMunicipioInfo
 } from '../../lib/map'
-import { captureMapView, downloadRelatorioPdf, slugRelatorio } from '../../lib/relatorio-pdf'
+import { captureMapView, downloadRelatorioPdf, legendGroupsFromEsriDom, slugRelatorio } from '../../lib/relatorio-pdf'
 import PortalLoader from '../portal-loader'
 import './style.css'
 
@@ -258,6 +258,19 @@ export default function AtlasMap (props: { folderUrl: string }) {
           ]
         },
         mapCaption: 'Captura da vista atual do Atlas',
+        mapLegendTitle: 'Legenda do mapa',
+        mapLegendNote: 'Símbolos e cores iguais aos da legenda do mapa na tela.',
+        mapLegend: await (async () => {
+          const box = legendRef.current
+          const wasHidden = Boolean(box?.hidden)
+          if (box) box.hidden = false
+          try {
+            await new Promise((resolve) => setTimeout(resolve, 80))
+            return await legendGroupsFromEsriDom(box)
+          } finally {
+            if (box) box.hidden = wasHidden
+          }
+        })(),
         mapDataUrl: await captureMapView(view),
         sections: [
           {

@@ -2,6 +2,7 @@ import { loadArcGISJSAPIModules } from 'jimu-arcgis'
 import { findLayer, findSemiaridoLayer, findTerritorioLayer } from './layers'
 import { ASSET_DEFS } from './ativos'
 import { withoutDefinitionExpression } from './map'
+import { iconFromPreviewHtml } from './relatorio-pdf'
 
 export interface AssetLegendItem {
   id: string
@@ -254,4 +255,32 @@ export async function loadAssetLegend (
   )
 
   return [...boundaries, ...groups].filter(Boolean) as AssetLegendGroup[]
+}
+
+export function legendColorFromPreview (preview: string): string {
+  const html = String(preview || '')
+  const rgba = html.match(/rgba?\(\s*[\d.]+(?:\s*,\s*[\d.]+){2,3}\s*\)/i)
+  if (rgba) return rgba[0]
+  const hex = html.match(/#([0-9a-fA-F]{3,8})\b/)
+  if (hex) return hex[0]
+  return '#1aa8c8'
+}
+
+export async function legendGroupsForPdf (groups: AssetLegendGroup[]): Promise<Array<{
+  title?: string
+  items: Array<{ label: string, color: string, icon?: string | null }>
+}>> {
+  const out: Array<{ title?: string, items: Array<{ label: string, color: string, icon?: string | null }> }> = []
+  for (const group of groups.filter((item) => item.items?.length)) {
+    const items = []
+    for (const item of group.items) {
+      items.push({
+        label: group.showCount === false ? item.label : `${item.label} (${item.count})`,
+        color: legendColorFromPreview(item.preview),
+        icon: await iconFromPreviewHtml(item.preview)
+      })
+    }
+    out.push({ title: group.title, items })
+  }
+  return out
 }

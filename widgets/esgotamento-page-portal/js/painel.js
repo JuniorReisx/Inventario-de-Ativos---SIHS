@@ -513,12 +513,6 @@ function renderMap(){
       pathEl.classList.toggle('dim', !inFilter);
     }
   });
-
-  const legendHtml = [['100% adequado',0],['75%',25],['50%',50],['25%',75],['0% adequado',100]].map(([lbl,v])=>
-    `<span><span class="sw" style="background:${colorForPct(v)}"></span>${lbl}</span>`).join('') +
-    `<span><span class="sw" style="background:${MUN_FILL_NEUTRAL}"></span>Sem dado</span>`;
-  const legendSlot = document.querySelector('#view-'+state.tab+' .legend-slot');
-  if(legendSlot) legendSlot.innerHTML = legendHtml;
 }
 
 // ================= VIEW ESGOTO =================
@@ -560,10 +554,8 @@ function renderTabEsgoto(){
       <div class="val">${fmt(comBanh)}</div><div class="sub">${fmt1(pctCom)}%</div><div class="lbl">Domicílios c/ banheiro ou sanitário</div></div>
     <div class="kpi alerta">${infoTip('Domicílios sem banheiro nem sanitário, conforme SIDRA/Censo 2022.')}
       <div class="val">${fmt(v.esg_sem)}</div><div class="sub">${fmt1(pctSem)}%</div><div class="lbl">Sem banheiro nem sanitário</div></div>
-    <div class="kpi">${infoTip('Percentual de domicílios com esgotamento adequado: rede geral/pluvial ou fossa ligada à rede + fossa séptica/filtro. “Acima/abaixo da Bahia (ou do território)” é a diferença entre os percentuais — se o município tem 71% e a Bahia 83%, está 12 abaixo da Bahia.')}
+    <div class="kpi">${infoTip('Percentual de domicílios com esgotamento adequado: rede geral/pluvial ou fossa ligada à rede + fossa séptica/filtro.')}
       <div class="val">${fmt1(cl.pctAdeq)}%</div>
-      ${vsBa?`<div class="sub vs-ba-kpi ${deltaClass(dAdeqBa,true)}">${fmtDeltaVs(dAdeqBa, 'Bahia')}</div>`:''}
-      ${dAdeqTi!=null?`<div class="sub vs-ba-kpi ${deltaClass(dAdeqTi,true)}">${fmtDeltaVs(dAdeqTi, 'território')}</div>`:''}
       <div class="lbl">Atendimento adequado</div></div>
   `;
 

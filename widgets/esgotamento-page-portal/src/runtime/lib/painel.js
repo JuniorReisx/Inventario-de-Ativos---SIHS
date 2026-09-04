@@ -65,40 +65,55 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
   
   /* Cores fixas por categoria SIDRA — paleta marrom do esgotamento */
   const ESG_CAT_COLORS = {
-    esg_rede:      '#1A0F08', // Rede geral / pluvial ou fossa ligada
-    esg_fossa_sep: '#5C3A1E', // Fossa séptica / filtro não ligada à rede
-    esg_fossa_rud: '#8B5A2B', // Fossa rudimentar ou buraco
-    esg_vala:      '#B8752F', // Vala
-    esg_rio:       '#C99A4A', // Rio, lago, córrego ou mar
-    esg_outra:     '#D9BC8C', // Outra forma
-    esg_sem:       '#F5EBDD', // Sem banheiro
+    esg_rede_pluvial: '#1A0F08',
+    esg_fossa_ligada: '#5C3A1E',
+    esg_rede:      '#1A0F08',
+    esg_fossa_sep: '#8B5A2B',
+    esg_fossa_rud: '#B8752F',
+    esg_vala:      '#C99A4A',
+    esg_rio:       '#D9BC8C',
+    esg_outra:     '#E8D4B8',
+    esg_sem:       '#F5EBDD',
   };
   function categoryColors(cats){
     return cats.map(c => ESG_CAT_COLORS[c.key] || '#6b7c8a');
   }
   
   // ---------------- agregação SIDRA 6805 ----------------
-  const ESG_KEYS = ['esg_rede','esg_fossa_sep','esg_fossa_rud','esg_vala','esg_rio','esg_outra','esg_sem'];
+  const ESG_KEYS = ['esg_rede_pluvial','esg_fossa_ligada','esg_rede','esg_fossa_sep','esg_fossa_rud','esg_vala','esg_rio','esg_outra','esg_sem'];
   
   function sumEsg(feats){
-    const out = { esg_total:0 };
+    const out = { esg_total:0, total_domicilios:0 };
     ESG_KEYS.forEach(k=> out[k]=0);
     feats.forEach(f=>{
       const p = f.properties;
       out.esg_total += p.esg_total||0;
+      out.total_domicilios += p.total_domicilios||0;
       ESG_KEYS.forEach(k=> out[k] += p[k]||0);
     });
     return out;
   }
+
+  function totalDomicilios (v) {
+    return (v.total_domicilios||0) > 0 ? v.total_domicilios : (v.esg_total||0);
+  }
+
+  function ligacaoEsg (v) {
+    const pluvial = v.esg_rede_pluvial||0;
+    const fossaLigada = v.esg_fossa_ligada||0;
+    const split = pluvial + fossaLigada;
+    const highlight = split > 0 ? split : (v.esg_rede||0);
+    return { pluvial, fossaLigada, highlight };
+  }
   
   function classifyEsg(v){
-    const adequado = (v.esg_rede||0) + (v.esg_fossa_sep||0);
-    const inadequado = (v.esg_fossa_rud||0) + (v.esg_vala||0) + (v.esg_rio||0) + (v.esg_outra||0);
+    const lig = ligacaoEsg(v);
+    const inadequado = (v.esg_fossa_sep||0) + (v.esg_fossa_rud||0) + (v.esg_vala||0) + (v.esg_rio||0) + (v.esg_outra||0);
     const sem = v.esg_sem||0;
-    const total = v.esg_total||0;
+    const total = totalDomicilios(v) || (v.esg_total||0);
     return {
-      adequado, inadequado, sem, total,
-      pctAdeq: total? adequado/total*100:0,
+      adequado: lig.highlight, inadequado, sem, total,
+      pctAdeq: total? lig.highlight/total*100:0,
       pctInadeq: total? inadequado/total*100:0,
       pctSem: total? sem/total*100:0,
     };
@@ -107,6 +122,9 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
   function mapMetricPct(p){
     return classifyEsg({
       esg_total: p.esg_total,
+      total_domicilios: p.total_domicilios,
+      esg_rede_pluvial: p.esg_rede_pluvial,
+      esg_fossa_ligada: p.esg_fossa_ligada,
       esg_rede: p.esg_rede,
       esg_fossa_sep: p.esg_fossa_sep,
       esg_fossa_rud: p.esg_fossa_rud,
@@ -150,22 +168,6 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
   
   function isFullState(){
     return !state.selectedMun && state.regiao === 'todas' && !state.semiOn;
-  }
-  
-  /** Diferença clara: "11,6 abaixo da Bahia" / "do território" (sem "p.p."). */
-  function fmtDeltaVs(pp, ref){
-    const fem = ref === 'Bahia';
-    const art = fem ? 'da' : 'do';
-    const artEq = fem ? 'à' : 'ao';
-    if(Math.abs(pp) < 0.05) return `igual ${artEq} ${ref}`;
-    if(pp > 0) return `${fmt1(pp)} acima ${art} ${ref}`;
-    return `${fmt1(Math.abs(pp))} abaixo ${art} ${ref}`;
-  }
-  
-  function deltaClass(pp, higherIsBetter){
-    if(Math.abs(pp) < 0.05) return 'neu';
-    const better = higherIsBetter ? pp > 0 : pp < 0;
-    return better ? 'up' : 'down';
   }
   
   function infoTip(text){
@@ -215,9 +217,7 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
     const shareDomTi = terr?.v?.esg_total ? (v.esg_total||0)/terr.v.esg_total*100 : null;
     const sharePopTi = terr?.pop ? pop/terr.pop*100 : null;
   
-    const cell = (titulo, sel, ti, ba, betterHigher) => {
-      const dBa = sel - ba;
-      const dTi = ti==null ? null : sel - ti;
+    const cell = (titulo, sel, ti, ba) => {
       return `
       <div class="cmp-cell">
         <div class="cmp-cell-lbl">${titulo}</div>
@@ -225,10 +225,6 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
           <div><span class="cmp-k">Seleção</span><span class="cmp-n">${fmt1(sel)}%</span></div>
           ${ti!=null?`<div><span class="cmp-k">Território</span><span class="cmp-n muted">${fmt1(ti)}%</span></div>`:''}
           <div><span class="cmp-k">Bahia</span><span class="cmp-n muted">${fmt1(ba)}%</span></div>
-        </div>
-        <div class="cmp-deltas">
-          ${dTi!=null?`<div class="cmp-delta ${deltaClass(dTi, betterHigher)}">${fmtDeltaVs(dTi, 'território')}</div>`:''}
-          <div class="cmp-delta ${deltaClass(dBa, betterHigher)}">${fmtDeltaVs(dBa, 'Bahia')}</div>
         </div>
       </div>`;
     };
@@ -244,9 +240,9 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
           <div class="cmp-share"><strong>${fmt(feats.length)}</strong><span>de ${fmt(GEO.features.length)} municípios</span></div>
         </div>
         <div class="cmp-grid ${terr?'has-ti':''}">
-          ${cell('Atendimento adequado', cl.pctAdeq, terr?terr.cl.pctAdeq:null, bahiaCl.pctAdeq, true)}
-          ${cell('Inadequado', cl.pctInadeq, terr?terr.cl.pctInadeq:null, bahiaCl.pctInadeq, false)}
-          ${cell(semLabel, cl.pctSem, terr?terr.cl.pctSem:null, bahiaCl.pctSem, false)}
+          ${cell('Rede, pluvial ou fossa ligada à rede', cl.pctAdeq, terr?terr.cl.pctAdeq:null, bahiaCl.pctAdeq)}
+          ${cell('Inadequado', cl.pctInadeq, terr?terr.cl.pctInadeq:null, bahiaCl.pctInadeq)}
+          ${cell(semLabel, cl.pctSem, terr?terr.cl.pctSem:null, bahiaCl.pctSem)}
         </div>
       </div>`;
   }
@@ -552,29 +548,33 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
         pathEl.classList.toggle('dim', !inFilter);
       }
     });
-  
-    const legendHtml = [['100% adequado',0],['75%',25],['50%',50],['25%',75],['0% adequado',100]].map(([lbl,v])=>
-      `<span><span class="sw" style="background:${colorForPct(v)}"></span>${lbl}</span>`).join('') +
-      `<span><span class="sw" style="background:${MUN_FILL_NEUTRAL}"></span>Sem dado</span>`;
-    const legendSlot = qs('#view-'+state.tab+' .legend-slot');
-    if(legendSlot) legendSlot.innerHTML = legendHtml;
   }
   
   // ================= VIEW ESGOTO =================
   const ESG_COMP_CATS = [
+    {key:'esg_rede_pluvial', label:'Rede geral ou pluvial', good:true},
+    {key:'esg_fossa_ligada', label:'Fossa séptica ou fossa filtro ligada à rede', good:true},
+    {key:'esg_fossa_sep', label:'Fossa séptica/filtro não ligada à rede', good:true},
+    {key:'esg_fossa_rud', label:'Fossa rudimentar ou buraco', good:false},
+    {key:'esg_vala', label:'Vala', good:false},
+    {key:'esg_rio', label:'Rio, lago, córrego ou mar', good:false},
+    {key:'esg_outra', label:'Outra forma', good:false},
+    {key:'esg_sem', label:'Não tinham banheiro nem sanitário', good:false},
+  ];
+  const ESG_LEGACY_CATS = [
     {key:'esg_rede', label:'Rede geral / pluvial ou fossa ligada à rede', good:true},
     {key:'esg_fossa_sep', label:'Fossa séptica/filtro não ligada à rede', good:true},
     {key:'esg_fossa_rud', label:'Fossa rudimentar ou buraco', good:false},
     {key:'esg_vala', label:'Vala', good:false},
     {key:'esg_rio', label:'Rio, lago, córrego ou mar', good:false},
     {key:'esg_outra', label:'Outra forma', good:false},
-    {key:'esg_sem', label:'Sem banheiro nem sanitário', good:false},
+    {key:'esg_sem', label:'Não tinham banheiro nem sanitário', good:false},
   ];
   // Setores só trazem rede × (banheiro sem rede) × sem banheiro — sem detalhe de fossa/vala/rio
   const ESG_SETORES_CATS = [
     {key:'esg_rede', label:'Rede geral / pluvial ou fossa ligada à rede', good:true},
     {key:'esg_outra', label:'Com banheiro, fora da rede (fossa, vala, rio ou outra)', good:false},
-    {key:'esg_sem', label:'Sem banheiro nem sanitário', good:false},
+    {key:'esg_sem', label:'Não tinham banheiro nem sanitário', good:false},
   ];
   
   function currentSetoresFeatures(){
@@ -814,47 +814,83 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
     bindPieInteractions(slot);
   }
 
+  function isEmbasaServed (value) {
+    if (value == null || value === '') return false
+    if (typeof value === 'boolean') return value
+    if (typeof value === 'number') return value === 1
+    const normalized = String(value)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toUpperCase()
+    if (!normalized || normalized === 'NAO' || normalized === 'N' || normalized === '0' || normalized.includes('NAO ATEND')) {
+      return false
+    }
+    return (
+      normalized === 'SIM' ||
+      normalized === 'S' ||
+      normalized === '1' ||
+      normalized === 'TRUE' ||
+      normalized === 'ATENDIDO' ||
+      normalized.includes('ATENDIDO') ||
+      normalized.includes('EMBASA')
+    )
+  }
+
+  function embasaEsgotoStatus (value) {
+    if (value == null || String(value).trim() === '') return { label: 'Sem informação', kind: 'unknown' }
+    return isEmbasaServed(value)
+      ? { label: 'Atendido', kind: 'yes' }
+      : { label: 'Não atendido', kind: 'no' }
+  }
+
   function renderTabEsgoto(){
     const feats = currentSelectionFeatures();
     const v = sumEsg(feats);
     const cl = classifyEsg(v);
     const pop = feats.reduce((s,f)=>s+(f.properties.populacao||0),0);
-    const comBanh = Math.max(0, (v.esg_total||0) - (v.esg_sem||0));
-    const pctCom = v.esg_total ? comBanh/v.esg_total*100 : 0;
-    const pctSem = v.esg_total ? (v.esg_sem||0)/v.esg_total*100 : 0;
+    const lig = ligacaoEsg(v);
+    const tot = totalDomicilios(v);
+    const pctHighlight = tot ? lig.highlight/tot*100 : 0;
+    const pctSem = tot ? (v.esg_sem||0)/tot*100 : 0;
+    const pctPluvial = tot ? lig.pluvial/tot*100 : 0;
+    const pctFossaLig = tot ? lig.fossaLigada/tot*100 : 0;
+    const formaCats = lig.pluvial + lig.fossaLigada > 0 ? ESG_COMP_CATS : ESG_LEGACY_CATS;
   
     const bahiaV = sumEsg(GEO.features);
     const bahiaCl = classifyEsg(bahiaV);
     const terr = getTerritorioContext();
-    const vsBa = !isFullState();
-    const dAdeqBa = cl.pctAdeq - bahiaCl.pctAdeq;
-    const dAdeqTi = terr ? cl.pctAdeq - terr.cl.pctAdeq : null;
   
     const kpiRow = qs('#'+'kpiRow-esgoto');
     if (kpiRow) kpiRow.innerHTML = `
       <div class="kpi">${infoTip('Quantidade de municípios incluídos no filtro ou município atualmente selecionado.')}
         <div class="val">${fmt(feats.length)}</div><div class="lbl">Municípios na seleção</div></div>
-      <div class="kpi">${infoTip('População estimada IBGE 2025 somada dos municípios da seleção.')}
-        <div class="val">${fmt(pop)}</div><div class="lbl">População (estimativa 2025)</div></div>
-      <div class="kpi bom">${infoTip('Domicílios com banheiro ou sanitário = total de domicílios menos a categoria “sem banheiro nem sanitário”.')}
-        <div class="val">${fmt(comBanh)}</div><div class="sub">${fmt1(pctCom)}%</div><div class="lbl">Domicílios c/ banheiro ou sanitário</div></div>
-      <div class="kpi alerta">${infoTip('Domicílios sem banheiro nem sanitário, conforme SIDRA/Censo 2022.')}
-        <div class="val">${fmt(v.esg_sem)}</div><div class="sub">${fmt1(pctSem)}%</div><div class="lbl">Sem banheiro nem sanitário</div></div>
-      <div class="kpi">${infoTip('Percentual de domicílios com esgotamento adequado: rede geral/pluvial ou fossa ligada à rede + fossa séptica/filtro. “Acima/abaixo da Bahia (ou do território)” é a diferença entre os percentuais — se o município tem 71% e a Bahia 83%, está 12 abaixo da Bahia.')}
-        <div class="val">${fmt1(cl.pctAdeq)}%</div>
-        ${vsBa?`<div class="sub vs-ba-kpi ${deltaClass(dAdeqBa,true)}">${fmtDeltaVs(dAdeqBa, 'Bahia')}</div>`:''}
-        ${dAdeqTi!=null?`<div class="sub vs-ba-kpi ${deltaClass(dAdeqTi,true)}">${fmtDeltaVs(dAdeqTi, 'território')}</div>`:''}
-        <div class="lbl">Atendimento adequado</div></div>
+      <div class="kpi">${infoTip('População estimada IBGE 2026 somada dos municípios da seleção.')}
+        <div class="val">${fmt(pop)}</div><div class="lbl">População (estimativa 2026)</div></div>
+      <div class="kpi">${infoTip('Total de domicílios particulares permanentes recenseados no recorte (Censo IBGE 2022 · DPA Indicadores: total_domicílios_recenseados / dom_rec_2022).')}
+        <div class="val">${fmt(tot)}</div><div class="lbl">Total de domicílios</div></div>
+      <div class="kpi bom">${infoTip('Soma dos campos DPA “rede geral ou pluvial” e “fossa séptica ou fossa filtro ligada à rede” (SIDRA tabela 6805). É o mesmo destaque do card de esgoto no Inventário.')}
+        <div class="val">${fmt(lig.highlight)}</div><div class="sub">${fmt1(pctHighlight)}%</div><div class="lbl">Rede geral, rede pluvial ou fossa ligada à rede</div></div>
+      <div class="kpi alerta">${infoTip('Domicílios que não tinham banheiro nem sanitário, conforme SIDRA/Censo 2022 (esg_n_t_bs).')}
+        <div class="val">${fmt(v.esg_sem)}</div><div class="sub">${fmt1(pctSem)}%</div><div class="lbl">Não tinham banheiro nem sanitário</div></div>
+      <div class="kpi bom">${infoTip('Domicílios cuja forma de esgotamento é rede geral ou rede pluvial (campo DPA esg_rede_geral_ou_pluvia).')}
+        <div class="val">${fmt(lig.pluvial)}</div>
+        <div class="sub">${fmt1(pctPluvial)}%</div>
+        <div class="lbl">Rede geral ou pluvial</div></div>
+      <div class="kpi">${infoTip('Domicílios com fossa séptica ou fossa filtro ligada à rede (campo DPA esg_fossa_septica_ou_fossa_filtro_ligada_a_rede).')}
+        <div class="val">${fmt(lig.fossaLigada)}</div>
+        <div class="sub">${fmt1(pctFossaLig)}%</div>
+        <div class="lbl">Fossa séptica ou fossa filtro ligada à rede</div></div>
     `;
   
-    const colors = categoryColors(ESG_COMP_CATS);
+    const colors = categoryColors(formaCats);
     const compTitle = 'Formas de esgotamento';
     setPanelHeader('#view-esgoto .area-comp .panel-header', compTitle,
       'Cada card mostra a quantidade de domicílios e a % na seleção. Quando há município ou recorte, também aparece o peso no território e na Bahia.');
 
     const compChart = qs('#'+'compChart-esgoto');
     if (compChart) compChart.innerHTML = renderCompChart({
-      cats: ESG_COMP_CATS, colors, v, cl, bahiaV, bahiaCl, terr,
+      cats: formaCats, colors, v, cl, bahiaV, bahiaCl, terr,
       lightColor: '#F5EBDD', lightBorder: '#D9BC8C',
       tip: 'Valor = domicílios. % = participação na seleção. Território/Bahia = peso desta seleção no total daquela forma.',
     });
@@ -876,14 +912,17 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
   
     qs('#'+'muniDetailName').textContent = p.nm_mun;
   
-    const esg = classifyEsg(p);
+    const embasa = embasaEsgotoStatus(p.embasa_esgoto);
     const meta = [p.territorio, p.semiarido==='SIM' ? 'Semiárido' : null].filter(Boolean).join(' · ');
     qs('#'+'muniDetailBody').innerHTML = `
       <p class="muni-detail-meta" title="${meta}">${meta}</p>
+      <div class="embasa-status is-${embasa.kind}" role="status">
+        <span class="embasa-status__brand">Embasa</span>
+        <strong class="embasa-status__value">${embasa.label}</strong>
+      </div>
       <div class="detail-grid">
-        <div class="detail-item"><div class="v">${fmt1(esg.pctAdeq)}%</div><div class="l">Esgoto adequado</div></div>
         <div class="detail-item"><div class="v">${fmt(p.populacao)}</div><div class="l">População</div></div>
-        <div class="detail-item"><div class="v">${fmt(p.esg_total)}</div><div class="l">Domicílios</div></div>
+        <div class="detail-item"><div class="v">${fmt(p.total_domicilios || p.esg_total)}</div><div class="l">Domicílios</div></div>
         <div class="detail-item wide"><div class="v text">${p.territorio}</div><div class="l">Território de Identidade</div></div>
       </div>
     `;
@@ -1017,9 +1056,13 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
       const v = sumEsg(feats);
       const cl = classifyEsg(v);
       const pop = feats.reduce((s,f)=>s+(f.properties.populacao||0),0);
-      const comBanh = Math.max(0, (v.esg_total||0) - (v.esg_sem||0));
-      const pctCom = v.esg_total ? comBanh/v.esg_total*100 : 0;
-      const pctSem = v.esg_total ? (v.esg_sem||0)/v.esg_total*100 : 0;
+      const lig = ligacaoEsg(v);
+      const tot = totalDomicilios(v);
+      const pctHighlight = tot ? lig.highlight/tot*100 : 0;
+      const pctSem = tot ? (v.esg_sem||0)/tot*100 : 0;
+      const pctPluvial = tot ? lig.pluvial/tot*100 : 0;
+      const pctFossaLig = tot ? lig.fossaLigada/tot*100 : 0;
+      const formaCats = lig.pluvial + lig.fossaLigada > 0 ? ESG_COMP_CATS : ESG_LEGACY_CATS;
       const setorFeats = currentSetoresFeatures();
       const urbFeats = setorFeats.filter(f=>f.properties.situacao==='Urbana');
       const rurFeats = setorFeats.filter(f=>f.properties.situacao==='Rural');
@@ -1032,12 +1075,13 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
       const rPct = setorTot ? rurTot/setorTot*100 : 0;
       const pctIn = (part, tot) => tot ? fmt1(part/tot*100)+'% da área' : '—';
       const mapDataUrl = mapApi && typeof mapApi.capture === 'function' ? await mapApi.capture(state) : null;
-      const formaBars = ESG_COMP_CATS.map(c=>{
+      const mapLegend = mapApi && typeof mapApi.captureLegend === 'function' ? await mapApi.captureLegend() : [];
+      const formaBars = formaCats.map(c=>{
         const val = v[c.key]||0;
         return {
           label: c.label,
           value: fmt(val),
-          pct: v.esg_total ? val/v.esg_total*100 : 0,
+          pct: tot ? val/tot*100 : 0,
           color: ESG_CAT_COLORS[c.key] || '#8B5A2B'
         };
       });
@@ -1049,10 +1093,12 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
         fileName: `relatorio-esgotamento-${slugRelatorio(currentSelectionLabel())}.pdf`,
         kpis: [
           { label: 'Municípios na seleção', value: fmt(feats.length) },
-          { label: 'População (estimativa 2025)', value: fmt(pop) },
-          { label: 'Domicílios c/ banheiro ou sanitário', value: fmt(comBanh), sub: fmt1(pctCom)+'%' },
-          { label: 'Sem banheiro nem sanitário', value: fmt(v.esg_sem), sub: fmt1(pctSem)+'%' },
-          { label: 'Atendimento adequado', value: fmt1(cl.pctAdeq)+'%' },
+          { label: 'População (estimativa 2026)', value: fmt(pop) },
+          { label: 'Total de domicílios', value: fmt(tot) },
+          { label: 'Rede geral, rede pluvial ou fossa ligada à rede', value: fmt(lig.highlight), sub: fmt1(pctHighlight)+'%' },
+          { label: 'Não tinham banheiro nem sanitário', value: fmt(v.esg_sem), sub: fmt1(pctSem)+'%' },
+          { label: 'Rede geral ou pluvial', value: fmt(lig.pluvial), sub: fmt1(pctPluvial)+'%' },
+          { label: 'Fossa séptica ou fossa filtro ligada à rede', value: fmt(lig.fossaLigada), sub: fmt1(pctFossaLig)+'%' },
         ],
         guide: {
           title: 'Como ler este relatório',
@@ -1064,6 +1110,9 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
         },
         mapCaption: currentSelectionLabel(),
         mapDataUrl,
+        mapLegendTitle: 'Legenda do mapa',
+        mapLegendNote: 'Símbolos e cores iguais aos da legenda do mapa na tela.',
+        mapLegend,
         sections: [
           {
             title: '1. Domicílios por forma de esgotamento (dado municipal)',
@@ -1090,7 +1139,7 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
             note: 'Percentual dentro do urbano e dentro do rural. Ex.: 40% no urbano = 40% dos domicílios urbanos usam aquela forma — não 40% do município. Os totais oficiais continuam na seção 1.',
             table: {
               headers: ['Forma de esgotamento', 'No urbano', 'No rural'],
-              rows: ESG_COMP_CATS.filter(c=>((urb[c.key]||0)+(rur[c.key]||0))>0).map(c=>[
+              rows: ESG_SETORES_CATS.filter(c=>((urb[c.key]||0)+(rur[c.key]||0))>0).map(c=>[
                 c.label,
                 pctIn(urb[c.key]||0, urbTot),
                 pctIn(rur[c.key]||0, rurTot)
@@ -1104,11 +1153,13 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
               headers: ['Indicador', 'Fonte'],
               colWeights: [1.15, 2.35],
               rows: [
-                ['População', 'Estimativa IBGE 2025 · DPA Indicadores (estimativa_pop_2025)'],
+                ['População', 'Estimativa IBGE 2026 · DPA Indicadores (população estimada)'],
+                ['Total de domicílios', 'Censo IBGE 2022 · DPA Indicadores (total_domicílios_recenseados / dom_rec_2022)'],
                 ['Municípios na seleção', 'Contagem do recorte no mapa · DPA_Indicadores_Censo_2022'],
-                ['Rede, fossa séptica, fossa rudimentar, vala, rio e outra forma', 'SIDRA tabela 6805 · Censo IBGE 2022 · DPA Indicadores (campos esg_*)'],
-                ['Sem banheiro nem sanitário', 'SIDRA tabela 6805 · DPA Indicadores (esg_n_t_bs)'],
-                ['Atendimento adequado', 'Calculado no painel: rede/fossa ligada + fossa séptica (SIDRA 6805 / DPA)'],
+                ['Rede geral, rede pluvial ou fossa ligada à rede', 'Soma DPA: esg_rede_geral_ou_pluvia + esg_fossa_septica_ou_fossa_filtro_ligada_a_rede (SIDRA 6805)'],
+                ['Rede geral ou pluvial', 'SIDRA tabela 6805 · DPA Indicadores (esg_rede_geral_ou_pluvia)'],
+                ['Fossa séptica ou fossa filtro ligada à rede', 'SIDRA tabela 6805 · DPA Indicadores (esg_fossa_septica_ou_fossa_filtro_ligada_a_rede)'],
+                ['Não tinham banheiro nem sanitário', 'SIDRA tabela 6805 · DPA Indicadores (esg_n_t_bs)'],
                 ['Domicílios urbanos e rurais', 'Censo IBGE 2022 · Setores Censitarios_BA (Situação do setor + v0002)'],
                 ['Formas no urbano e no rural', 'Censo IBGE 2022 · Setores censitários (v00309 rede, v00232 banheiro). Não fecha com o total municipal da tabela 6805.'],
                 ['Mapa da seleção', 'Web map de esgotamento · camada municipal DPA Indicadores']

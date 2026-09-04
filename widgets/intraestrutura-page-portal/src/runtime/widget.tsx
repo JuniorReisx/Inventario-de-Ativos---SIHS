@@ -46,7 +46,7 @@ import {
   setorWhere,
   type SetorItem
 } from './lib/setores'
-import { loadAssetLegend, type AssetLegendGroup } from './lib/legend'
+import { loadAssetLegend, legendGroupsForPdf, type AssetLegendGroup } from './lib/legend'
 import HeroInfraestrutura from './components/hero-infraestrutura'
 import PieChart from './components/pie-chart'
 import SistemasMap from './components/sistemas-map'
@@ -1248,6 +1248,10 @@ const Widget = (props: AllWidgetProps<any>) => {
           { label: 'População no recorte', value: formatPopulation(population) },
           { label: 'Municípios no semiárido', value: formatPopulation(semiCount) }
         ],
+        mapCaption: scopeLabel,
+        mapLegendTitle: 'Legenda do mapa',
+        mapLegendNote: 'Símbolos e classes visíveis no recorte atual.',
+        mapLegend: await legendGroupsForPdf(legend),
         mapDataUrl: await (async () => {
           const view = viewRef.current
           const previous = view?.viewpoint?.clone?.() || view?.extent?.clone?.()
@@ -1276,7 +1280,8 @@ const Widget = (props: AllWidgetProps<any>) => {
     municipios,
     territorialMunicipios,
     scopeLabel,
-    restoreScopeView
+    restoreScopeView,
+    legend
   ])
 
   return (

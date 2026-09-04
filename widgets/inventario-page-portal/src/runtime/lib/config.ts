@@ -4,8 +4,9 @@ export const DEFAULT_OAUTH_APP_ID = ''
 
 /** Camada municipal atualizada (Censo 2022) — fonte de municípios (estado / TI). */
 export const DPA_MUNICIPIO_LAYER_TITLE = 'PDA_Indicadores_Censo_2022'
-/** População municipal estimada IBGE 2025 (último campo da camada de município). */
-export const MUNICIPIO_POP_EST_2025_FIELD = 'estimativa_pop_2025'
+/** População municipal estimada IBGE 2026 (último campo nas camadas DPA, Limite Bahia e Semiárido). */
+export const MUNICIPIO_POP_EST_FIELD = 'pop_est_2026'
+export const MUNICIPIO_POP_EST_2025_FIELD = MUNICIPIO_POP_EST_FIELD
 /** Recorte oficial da região semiárida (abastecimento, esgotamento e demais indicadores). */
 export const SEMIARIDO_LAYER_TITLE = 'Região Semiárida_BA'
 
@@ -185,13 +186,13 @@ export const STAT_CARDS: IndicatorDefinition[] = [
     label: 'População total',
     layerTitle: 'Limite Bahia',
     statisticType: 'sum',
-    onStatisticField: 'pop_est_2025',
+    onStatisticField: 'pop_est_2026',
     size: 'large',
     filteredScope: {
       layerTitle: DPA_MUNICIPIO_LAYER_TITLE,
-      onStatisticField: MUNICIPIO_POP_EST_2025_FIELD,
+      onStatisticField: MUNICIPIO_POP_EST_FIELD,
       statisticType: 'sum',
-      sourceLabel: 'Estimativa IBGE 2025'
+      sourceLabel: 'Estimativa IBGE 2026'
     }
   },
   {

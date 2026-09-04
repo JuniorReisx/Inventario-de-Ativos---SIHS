@@ -87,7 +87,7 @@ const STEPS = [
 ]
 
 const SOURCES: Array<[string, string]> = [
-  ['População residente', 'Estimativa IBGE 2025 (campo estimativa_pop_2025) na camada DPA_Indicadores_Censo_2022.'],
+  ['População residente', 'Estimativa IBGE 2026 (último campo de população estimada) nas camadas DPA_Indicadores_Censo_2022, Limite Bahia e Região Semiárida.'],
   ['Formas de abastecimento de água (rede, poço profundo, poço raso, fonte, pipa, chuva, rio, outra)', 'SIDRA tabela 6803 · Censo IBGE 2022 · DPA Indicadores (campos aa_*). Totais oficiais por município.'],
   ['Sem ligação à rede geral de água', 'SIDRA tabela 6803 · DPA Indicadores (aa_npl_rg).'],
   ['Atendimento adequado de água', 'Calculado no painel: rede geral + poço profundo/artesiano + poço raso/freático/cacimba (SIDRA 6803).'],

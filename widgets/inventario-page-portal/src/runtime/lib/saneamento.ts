@@ -929,10 +929,24 @@ export async function loadSaneamentoSummaries (
         || findLayer(webMap, { layerTitle: 'PDA_Indicadores_Censo_2022' })
         || findLayer(webMap, { layerTitle: 'DPA_Indicadores_Censo_2022' })
 
+      if (filter?.type === 'semiarido' && munLayer && typeof munLayer.queryFeatures === 'function') {
+        try {
+          const stats = await queryMunSums(munLayer, filter)
+          if (stats && (n(stats.a_tot) != null || n(stats.a_rede) != null || n(stats.e_tot) != null)) {
+            return {
+              agua: buildAguaFromMunStats(stats, scopeLabel, filter.type),
+              esgoto: buildEsgotoFromMunStats(stats, scopeLabel, filter.type)
+            }
+          }
+        } catch (error) {
+          console.warn('[sihs-dash] DPA do semiárido falhou, tentando a camada da região:', error)
+        }
+      }
+
       if (filter?.type === 'semiarido') {
         const record = await loadSemiaridoRecord(webMap)
         const stats = record ? saneamentoStatsFromRecord(record) : null
-        if (stats && (n(stats.e_rede_pluvial) != null || n(stats.e_fossa_ligada) != null)) {
+        if (stats && (n(stats.e_rede_pluvial) != null || n(stats.e_fossa_ligada) != null || n(stats.a_tot) != null)) {
           return {
             agua: buildAguaFromMunStats(stats, scopeLabel, filter.type),
             esgoto: buildEsgotoFromMunStats(stats, scopeLabel, filter.type)

@@ -1,4 +1,5 @@
 import { loadArcGISJSAPIModules } from 'jimu-arcgis'
+import { captureEsriLegendFromView } from './relatorio-pdf'
 
 export const PORTAL_URL = 'https://portaldaagua.sihs.ba.gov.br/portal'
 /** Web map ABASTECIMENTO - Inventário de Ativos */
@@ -116,6 +117,34 @@ export function resolveField (layer: any, ...candidates: string[]): string {
     return ''
   }
   return candidates[0] || ''
+}
+
+/** Campo pop_est_2026 (população estimada IBGE 2026). */
+export function resolvePopEstimadaField (layer: any): string {
+  const exact = resolveField(layer, 'pop_est_2026', 'estimativa_pop_2026', 'populacao_estimada_2026', 'pop_2026')
+  if (exact) return exact
+
+  const fields: any[] = layer?.fields || []
+  const blob = (field: any) => `${normalizeText(field?.name || '')} ${normalizeText(field?.alias || '')}`
+  for (let i = fields.length - 1; i >= 0; i--) {
+    const text = blob(fields[i])
+    if (text.includes('2026') && (text.includes('pop') || text.includes('estimativ') || text.includes('populac'))) {
+      return fields[i].name
+    }
+  }
+
+  return resolveField(
+    layer,
+    'populacao estimada',
+    'populacao total (estimativa - 2026)',
+    'populacao_estimada',
+    'estimativa_pop_2025',
+    'pop_est_2025',
+    'estimativa_pop2025',
+    'populacao_estimada_2025',
+    'populacao total (estimativa - 2025)',
+    'pop_2025'
+  )
 }
 
 function sqlField (name: string): string {
@@ -566,6 +595,7 @@ export async function createMapView (container: HTMLElement, webMap: any): Promi
     group: 'top-left'
   })
   view.ui.add([zoom, home, legendExpand], 'top-left')
+  view.__portalLegendExpand = legendExpand
   addBasemapSwitcher(view, Expand, BasemapGallery, Basemap, LocalBasemapsSource)
 
   if (view.popup) {
@@ -680,6 +710,7 @@ export type PainelMapApi = {
   zoomToState: (state: PainelMapState) => Promise<void>
   zoomReset: () => Promise<void>
   capture: (state?: PainelMapState) => Promise<string | null>
+  captureLegend: () => Promise<import('./relatorio-pdf').RelatorioLegendGroup[]>
   setMunicipios: (items: Array<{ cod_mun?: string, nm_mun?: string }>) => void
   onSelect: (handler: (codMun: string) => void) => () => void
   onHover: (handler: (name: string | null, clientX: number, clientY: number) => void) => () => void
@@ -937,6 +968,10 @@ export function createMapApi (view: any, layer: any, options: {
           try { await view.goTo(previous, { duration: 0 }) } catch (_) {}
         }
       }
+    },
+
+    async captureLegend () {
+      return captureEsriLegendFromView(view)
     },
 
     onSelect (handler) {

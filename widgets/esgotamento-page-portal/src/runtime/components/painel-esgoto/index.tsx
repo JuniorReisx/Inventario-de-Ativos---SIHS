@@ -259,10 +259,6 @@ const PainelEsgoto = ({ folderUrl }: { folderUrl: string }) => {
                   <div className="esgo-map-view" ref={mapRef} />
                   <div className="map-hint" role="tooltip" aria-hidden="true"></div>
                 </div>
-                <div className="legend legend-slot"></div>
-                <div className="legend-note">
-                  Marrom escuro = 100% dos domicílios com esgotamento adequado (rede/fossa ligada ou fossa séptica). Marrom claro = 100% inadequado ou sem banheiro/sanitário.
-                </div>
               </div>
             </div>
 

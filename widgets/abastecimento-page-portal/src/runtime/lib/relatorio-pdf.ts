@@ -41,7 +41,21 @@ export type RelatorioPdfInput = {
   guide?: RelatorioGuide
   mapCaption?: string
   mapDataUrl?: string | null
+  mapLegend?: RelatorioLegendGroup[]
+  mapLegendTitle?: string
+  mapLegendNote?: string
   sections: RelatorioSection[]
+}
+
+export type RelatorioLegendItem = {
+  label: string
+  color: string
+  icon?: string | null
+}
+
+export type RelatorioLegendGroup = {
+  title?: string
+  items: RelatorioLegendItem[]
 }
 
 const THEMES: Record<RelatorioTheme, { header: string, header2: string, accent: string, kpi: string }> = {
@@ -79,6 +93,132 @@ function loadImage (url: string): Promise<HTMLImageElement> {
     img.onerror = () => reject(new Error('Falha ao carregar imagem do mapa'))
     img.src = url
   })
+}
+
+function waitImg (img: HTMLImageElement): Promise<void> {
+  if (img.complete && (img.naturalWidth || img.width)) return Promise.resolve()
+  return new Promise((resolve) => {
+    img.addEventListener('load', () => resolve(), { once: true })
+    img.addEventListener('error', () => resolve(), { once: true })
+    setTimeout(() => resolve(), 900)
+  })
+}
+
+function colorFromLegendSymbol (el: HTMLElement | null): string {
+  if (!el) return '#5b6b75'
+  const filled = el.querySelector('[fill]') as SVGElement | null
+  const fill = filled?.getAttribute('fill') || ''
+  if (fill && fill !== 'none' && !fill.startsWith('url(')) return fill
+  const styleText = el.getAttribute('style') || el.querySelector('[style]')?.getAttribute('style') || ''
+  const painted = String(styleText).match(/rgba?\([^)]+\)|#([0-9a-fA-F]{3,8})/i)
+  if (painted) return painted[0]
+  const nodes = [el, ...Array.from(el.querySelectorAll('*'))] as HTMLElement[]
+  for (const node of nodes) {
+    const bg = window.getComputedStyle(node).backgroundColor
+    if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') return bg
+  }
+  return '#5b6b75'
+}
+
+export async function iconFromLegendNode (root: HTMLElement | null): Promise<string | null> {
+  if (!root) return null
+  const canvasEl = root.querySelector('canvas') as HTMLCanvasElement | null
+  if (canvasEl && canvasEl.width && canvasEl.height) {
+    try { return canvasEl.toDataURL('image/png') } catch { /* canvas protegido */ }
+  }
+  const img = root.querySelector('img') as HTMLImageElement | null
+  if (img) {
+    await waitImg(img)
+    if (img.src && img.src.startsWith('data:')) return img.src
+    try {
+      const c = document.createElement('canvas')
+      const w = Math.max(1, img.naturalWidth || img.width || 24)
+      const h = Math.max(1, img.naturalHeight || img.height || 24)
+      c.width = w
+      c.height = h
+      const g = c.getContext('2d')
+      if (g) {
+        g.drawImage(img, 0, 0, w, h)
+        return c.toDataURL('image/png')
+      }
+    } catch { /* cors */ }
+    if (img.src) return img.src
+  }
+  const svg = root.querySelector('svg')
+  if (svg) {
+    const clone = svg.cloneNode(true) as SVGElement
+    if (!clone.getAttribute('xmlns')) clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+    const xml = new XMLSerializer().serializeToString(clone)
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(xml)}`
+  }
+  return null
+}
+
+export async function iconFromPreviewHtml (html: string): Promise<string | null> {
+  if (!html) return null
+  const host = document.createElement('div')
+  host.setAttribute('aria-hidden', 'true')
+  host.style.cssText = 'position:fixed;left:-9999px;top:0;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:#fff;'
+  host.innerHTML = html
+  document.body.appendChild(host)
+  try {
+    await Promise.all(Array.from(host.querySelectorAll('img')).map((node) => waitImg(node as HTMLImageElement)))
+    return await iconFromLegendNode(host)
+  } finally {
+    host.remove()
+  }
+}
+
+export async function legendGroupsFromEsriDom (container: HTMLElement | null): Promise<RelatorioLegendGroup[]> {
+  if (!container) return []
+  const groups: RelatorioLegendGroup[] = []
+  const layerNodes = Array.from(container.querySelectorAll('.esri-legend__layer')) as HTMLElement[]
+  const blocks = layerNodes.length ? layerNodes : [container]
+  for (const block of blocks) {
+    const title = (block.querySelector('.esri-legend__layer-caption, .esri-legend__layer-title, .esri-legend__service-label')?.textContent || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    const items: RelatorioLegendItem[] = []
+    const seen = new Set<string>()
+    for (const node of Array.from(block.querySelectorAll('.esri-legend__layer-row'))) {
+      const row = node as HTMLElement
+      if (row.style.display === 'none') continue
+      const info = row.querySelector('.esri-legend__layer-cell--info') as HTMLElement | null
+      const label = (info?.textContent || '').replace(/\s+/g, ' ').trim()
+      if (!label || seen.has(label)) continue
+      seen.add(label)
+      const symbol = row.querySelector('.esri-legend__layer-cell--symbols') as HTMLElement | null
+      items.push({
+        label,
+        color: colorFromLegendSymbol(symbol),
+        icon: await iconFromLegendNode(symbol)
+      })
+    }
+    if (items.length) groups.push({ title: title || undefined, items })
+  }
+  return groups
+}
+
+export async function captureEsriLegendFromView (view: any): Promise<RelatorioLegendGroup[]> {
+  if (!view) return []
+  const expand = view.__portalLegendExpand
+  const wasExpanded = Boolean(expand?.expanded)
+  try {
+    if (expand && !wasExpanded && typeof expand.expand === 'function') {
+      expand.expand()
+      await new Promise((resolve) => setTimeout(resolve, 320))
+    }
+    const root = view.container instanceof HTMLElement ? view.container : document.body
+    const legendRoot = root.querySelector('.esri-legend') as HTMLElement | null
+    if (legendRoot) {
+      await Promise.all(Array.from(legendRoot.querySelectorAll('img')).map((node) => waitImg(node as HTMLImageElement)))
+    }
+    return await legendGroupsFromEsriDom(legendRoot)
+  } finally {
+    if (expand && !wasExpanded && typeof expand.collapse === 'function') {
+      try { expand.collapse() } catch (_) {}
+    }
+  }
 }
 
 function strBytes (value: string): Uint8Array {
@@ -255,6 +395,96 @@ export function slugRelatorio (value: string): string {
     .slice(0, 72) || 'selecao'
 }
 
+async function paintMapLegend (
+  painter: ReportCanvas,
+  ctx: () => CanvasRenderingContext2D,
+  colors: (typeof THEMES)[RelatorioTheme],
+  input: RelatorioPdfInput
+): Promise<void> {
+  const groups = (input.mapLegend || []).filter((group) => group.items?.length)
+  if (!groups.length) return
+
+  const title = input.mapLegendTitle || 'Legenda do mapa'
+  const note = String(input.mapLegendNote || '').trim()
+  const colW = (CONTENT_W - 32) / 2
+  const rowH = 32
+  const sw = 22
+
+  ctx().font = '14px Segoe UI, Arial, sans-serif'
+  const noteLines = note ? wrapText(ctx(), note, CONTENT_W - 8) : []
+  painter.ensure(48 + noteLines.length * 18)
+  ctx().fillStyle = '#1c2b33'
+  ctx().font = '700 20px Segoe UI, Arial, sans-serif'
+  ctx().fillText(title, PAD, painter.y)
+  painter.y += 10
+  if (noteLines.length) {
+    ctx().fillStyle = '#5b6b75'
+    ctx().font = '14px Segoe UI, Arial, sans-serif'
+    noteLines.forEach((line) => {
+      ctx().fillText(line, PAD, painter.y + 16, CONTENT_W)
+      painter.y += 18
+    })
+    painter.y += 8
+  } else {
+    painter.y += 8
+  }
+
+  for (const group of groups) {
+    const rows = Math.max(1, Math.ceil(group.items.length / 2))
+    const boxH = (group.title ? 28 : 10) + rows * rowH + 14
+    painter.ensure(boxH + 8)
+    ctx().fillStyle = '#f4f7f9'
+    roundRect(ctx(), PAD, painter.y, CONTENT_W, boxH, 10)
+    ctx().fill()
+    let y = painter.y + 22
+    if (group.title) {
+      ctx().fillStyle = colors.header2
+      ctx().font = '700 15px Segoe UI, Arial, sans-serif'
+      ctx().fillText(group.title, PAD + 16, y, CONTENT_W - 32)
+      y += 22
+    }
+    for (let index = 0; index < group.items.length; index++) {
+      const item = group.items[index]
+      const col = index % 2
+      const row = Math.floor(index / 2)
+      const x = PAD + 16 + col * colW
+      const iy = y + row * rowH
+      ctx().fillStyle = '#ffffff'
+      roundRect(ctx(), x, iy - 14, sw, sw, 4)
+      ctx().fill()
+      ctx().strokeStyle = 'rgba(28,43,51,0.16)'
+      ctx().lineWidth = 1
+      ctx().stroke()
+      let drewIcon = false
+      if (item.icon) {
+        try {
+          const img = await loadImage(item.icon)
+          const max = 18
+          const ratio = (img.width || 1) / (img.height || 1)
+          let dw = max
+          let dh = max
+          if (ratio > 1) dh = max / ratio
+          else dw = max * ratio
+          ctx().drawImage(img, x + (sw - dw) / 2, iy - 14 + (sw - dh) / 2, dw, dh)
+          drewIcon = true
+        } catch {
+          drewIcon = false
+        }
+      }
+      if (!drewIcon) {
+        ctx().fillStyle = item.color || '#8aa0ab'
+        roundRect(ctx(), x + 4, iy - 10, 14, 14, 3)
+        ctx().fill()
+      }
+      ctx().fillStyle = '#2c3d47'
+      ctx().font = '14px Segoe UI, Arial, sans-serif'
+      ctx().fillText(item.label, x + sw + 8, iy, colW - sw - 18)
+    }
+    painter.y += boxH + 10
+  }
+  painter.y += 10
+}
+
 export async function downloadRelatorioPdf (input: RelatorioPdfInput): Promise<void> {
   const painter = new ReportCanvas(input.theme)
   const colors = painter.colors
@@ -369,6 +599,8 @@ export async function downloadRelatorioPdf (input: RelatorioPdfInput): Promise<v
       painter.y += 32
     }
   }
+
+  await paintMapLegend(painter, ctx, colors, input)
 
   for (const section of input.sections) {
     const bars = (section.bars || []).filter((bar) => bar.label)

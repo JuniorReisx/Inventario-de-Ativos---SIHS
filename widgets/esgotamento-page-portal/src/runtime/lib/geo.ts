@@ -1,4 +1,4 @@
-import { resolveField } from './map'
+import { resolveField, resolvePopEstimadaField } from './map'
 
 function num (value: any): number {
   const n = Number(value)
@@ -7,6 +7,17 @@ function num (value: any): number {
 
 function text (value: any): string {
   return String(value ?? '').trim()
+}
+
+function pickByTokens (attrs: Record<string, any>, includes: string[], excludes: string[] = []): any {
+  if (!attrs) return null
+  for (const key of Object.keys(attrs)) {
+    const name = key.toLowerCase()
+    if (excludes.some((token) => name.includes(token))) continue
+    if (!includes.every((token) => name.includes(token))) continue
+    if (attrs[key] != null && attrs[key] !== '') return attrs[key]
+  }
+  return null
 }
 
 function pick (attrs: Record<string, any>, ...keys: string[]): any {
@@ -30,6 +41,18 @@ function mapFeature (attrs: Record<string, any>, fields: {
   pop: string
 }) {
   const semiaridoRaw = pick(attrs, fields.semi, 'região_do_semiarida', 'regiao_do_semiarida', 'semiarido')
+  const rrpflg = num(pick(attrs, 'esg_rrpflg'))
+  let pluvial = num(pick(attrs, 'esg_rede_geral_ou_pluvia', 'esg_rede_geral_ou_pluvial'))
+  if (!pluvial) pluvial = num(pickByTokens(attrs, ['pluvia'], ['fossa', 'rrpflg']))
+  let fossaLigada = num(pick(
+    attrs,
+    'esg_fossa_septica_ou_fossa_filtro_ligada_a_rede',
+    'esg_fossa_septica_ou_fossa_filtro_ligada'
+  ))
+  if (!fossaLigada) fossaLigada = num(pickByTokens(attrs, ['fossa', 'ligada'], ['nao', 'rrpflg', 'rud', 'buraco']))
+  if (!pluvial && fossaLigada > 0 && rrpflg > 0 && fossaLigada === rrpflg) {
+    fossaLigada = 0
+  }
   return {
     type: 'Feature',
     geometry: null,
@@ -39,14 +62,37 @@ function mapFeature (attrs: Record<string, any>, fields: {
       nm_mun: text(pick(attrs, fields.name, 'nome_do_municipio', 'nm_mun')),
       territorio: text(pick(attrs, fields.ti, 'territorio_de_indentidade', 'territorio_de_identidade')),
       semiarido: /sim/i.test(String(semiaridoRaw || '')) ? 'SIM' : 'NÃO',
-      populacao: num(pick(attrs, fields.pop, 'estimativa_pop_2025', 'pop_est_2025', 'pop_2025', 'população__2022_', 'populacao__2022_')),
+      populacao: num(pick(
+        attrs,
+        fields.pop,
+        'estimativa_pop_2026',
+        'pop_est_2026',
+        'populacao_estimada_2026',
+        'populacao_estimada',
+        'estimativa_pop_2025',
+        'pop_est_2025',
+        'pop_2025',
+        'população__2022_',
+        'populacao__2022_'
+      )),
       pessoas_indigenas: num(pick(attrs, 'pessoas_indigenas__2022_')),
       pessoas_quilombolas: num(pick(attrs, 'pessoas_quilombolas__2022_')),
-      total_domicilios: num(pick(attrs, 'total_domicílios_recenseados__2')),
+      total_domicilios: num(pick(
+        attrs,
+        'total_domicílios_recenseados__2',
+        'total_domicilios_recenseados__2',
+        'total_domicílios_recenseados',
+        'dom_rec_2022',
+        'total_domicilios',
+        'tot_dom',
+        'domicilios'
+      )),
       pop_urbana: num(pick(attrs, 'st_d_urba_1')),
       pop_rural: num(pick(attrs, 'st_d_rural_1')),
       esg_total: num(pick(attrs, 'esg_total')),
-      esg_rede: num(pick(attrs, 'esg_rrpflg')),
+      esg_rede_pluvial: pluvial,
+      esg_fossa_ligada: fossaLigada,
+      esg_rede: pluvial || fossaLigada ? pluvial : rrpflg,
       esg_fossa_sep: num(pick(attrs, 'esg_fffnlg')),
       esg_fossa_rud: num(pick(attrs, 'esg_fr_b')),
       esg_vala: num(pick(attrs, 'esg_vala')),
@@ -69,17 +115,7 @@ export async function loadMunicipiosFromLayer (layer: any): Promise<{
     name: resolveField(layer, 'nome_do_municipio', 'nm_mun'),
     ti: resolveField(layer, 'territorio_de_indentidade', 'territorio'),
     semi: resolveField(layer, 'região_do_semiarida', 'regiao_do_semiarida'),
-    pop: resolveField(
-      layer,
-      'estimativa_pop_2025',
-      'pop_est_2025',
-      'estimativa_pop2025',
-      'populacao_estimada_2025',
-      'populacao total (estimativa - 2025)',
-      'pop_2025',
-      'população__2022_',
-      'populacao__2022_'
-    )
+    pop: resolvePopEstimadaField(layer)
   }
 
   let outFields: string[] = ['*']

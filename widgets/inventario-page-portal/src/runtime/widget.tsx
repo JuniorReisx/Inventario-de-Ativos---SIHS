@@ -273,24 +273,45 @@ async function resolveIndicatorValue (
   }
 
   if (filter.type === 'semiarido') {
-    const record = await loadSemiaridoRecord(webMap)
-    if (record) {
-      const value = valueFromSemiaridoRecord(definition, record)
-      if (value != null) {
-        return {
-          value,
-          sourceLabel: 'Região Semiárida_BA'
+    try {
+      const record = await loadSemiaridoRecord(webMap)
+      if (record) {
+        const value = valueFromSemiaridoRecord(definition, record)
+        if (value != null) {
+          return {
+            value,
+            sourceLabel: definition.id === 'pop_total' ? 'Estimativa IBGE 2026' : 'Região Semiárida_BA'
+          }
         }
       }
-      return {
-        unavailable: true,
-        message: 'Dado indisponível na Região Semiárida_BA'
+
+      if (definition.id === 'pop_total') {
+        const semiLayer = findSemiaridoLayer(webMap)
+        if (semiLayer && typeof semiLayer.queryFeatures === 'function') {
+          try { await semiLayer.load?.() } catch (_) {}
+          const field = pickMunicipioPopEst2025Field(semiLayer, 'pop_est_2026')
+          const stats = await queryStatistics(semiLayer, {
+            where: '1=1',
+            statisticType: 'sum',
+            onStatisticField: field,
+            outStatisticFieldName: 'value'
+          })
+          const summed = Number(stats?.value)
+          if (Number.isFinite(summed) && summed > 0) {
+            return {
+              value: summed,
+              sourceLabel: 'Estimativa IBGE 2026'
+            }
+          }
+        }
       }
+    } catch (error) {
+      console.warn('[sihs-dash] recorte semiárido, usando DPA:', error)
     }
   }
 
-  // Estado: Limite Bahia / pop_est_2025.
-  // Município, TI ou semiárido: camada municipal / estimativa_pop_2025.
+  // Estado: Limite Bahia / população estimada 2026 (último campo).
+  // Município, TI ou semiárido: camada municipal / população estimada 2026.
   if (filter.type !== 'all' && definition.filteredScope) {
     const scoped = definition.filteredScope
     const layer = (
@@ -427,7 +448,9 @@ async function resolveIndicatorValue (
     where,
     geometry,
     statisticType,
-    onStatisticField: definition.onStatisticField,
+    onStatisticField: definition.id === 'pop_total'
+      ? pickMunicipioPopEst2025Field(layer, definition.onStatisticField)
+      : definition.onStatisticField,
     outStatisticFieldName: 'value'
   })
 
@@ -1713,7 +1736,7 @@ const Widget = (props: AllWidgetProps<IMConfig>) => {
                 </article>
                 <p className="stat-source">
                   <span>
-                    Pop. estimada IBGE <strong>2025</strong>
+                    Pop. estimada IBGE <strong>2026</strong>
                   </span>
                   <span className="stats-year-ref__accent" aria-hidden="true" />
                 </p>

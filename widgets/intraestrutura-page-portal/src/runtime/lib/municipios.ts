@@ -5,7 +5,7 @@ export const MUN_FIELDS = {
   name: 'nome_do_municipio',
   territory: 'territorio_de_indentidade',
   semiarido: 'região_do_semiarida',
-  population: 'estimativa_pop_2025'
+  population: 'pop_est_2026'
 } as const
 
 const MUN_FIELD_CANDIDATES = {
@@ -13,6 +13,12 @@ const MUN_FIELD_CANDIDATES = {
   territory: ['territorio_de_indentidade', 'territorio_de_identidade', 'nm_ti', 'territorio'],
   semiarido: ['região_do_semiarida', 'regiao_do_semiarida', 'semiarido'],
   population: [
+    'pop_est_2026',
+    'estimativa_pop_2026',
+    'estimativa_pop2026',
+    'populacao_estimada_2026',
+    'pop_2026',
+    'populacao_estimada',
     'estimativa_pop_2025',
     'pop_est_2025',
     'estimativa_pop2025',
@@ -110,20 +116,15 @@ function pickLayerField (layer: any, candidates: readonly string[], fallback: st
 }
 
 function pickPopulationField (layer: any, fallback: string): string {
-  const est2025 = [
-    'estimativa_pop_2025',
-    'pop_est_2025',
-    'estimativa_pop2025',
-    'populacao_estimada_2025',
-    'pop_2025'
-  ] as const
-  const byName = pickLayerField(layer, est2025, '')
-  if (byName) return byName
-  const byAlias = (layer?.fields || []).find((field: any) => {
-    const text = `${normalizeKey(field?.name || '')} ${normalizeKey(field?.alias || '')}`
-    return text.includes('2025') && text.includes('estimativ') && (text.includes('populac') || text.includes('pop'))
+  const exact = pickLayerField(layer, ['pop_est_2026', 'estimativa_pop_2026', 'populacao_estimada_2026', 'pop_2026'], '')
+  if (exact) return exact
+  const fields: any[] = layer?.fields || []
+  const blob = (field: any) => `${normalizeKey(field?.name || '')} ${normalizeKey(field?.alias || '')}`
+  const byYear = fields.find((field: any) => {
+    const text = blob(field)
+    return text.includes('2026') && (text.includes('pop') || text.includes('estimativ') || text.includes('populac'))
   })
-  if (byAlias?.name) return byAlias.name
+  if (byYear?.name) return byYear.name
   return pickLayerField(layer, MUN_FIELD_CANDIDATES.population, fallback)
 }
 

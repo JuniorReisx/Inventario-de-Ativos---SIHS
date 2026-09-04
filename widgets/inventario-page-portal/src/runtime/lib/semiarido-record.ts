@@ -15,8 +15,25 @@ interface FieldHint {
 
 const FIELD_HINTS: Record<string, FieldHint> = {
   pop_total: {
-    names: ['estimativa_pop_2025', 'pop_est_2025', 'pop_2022', 'população__2022_', 'populacao__2022_', 'pop_total'],
-    phrases: ['populacao total (estimativa - 2025)', 'estimativa 2025', 'populacao total', 'pop total'],
+    names: [
+      'pop_est_2026',
+      'estimativa_pop_2026',
+      'populacao_estimada_2026',
+      'pop_2026',
+      'estimativa_pop_2025',
+      'pop_est_2025',
+      'pop_2022',
+      'população__2022_',
+      'populacao__2022_',
+      'pop_total'
+    ],
+    phrases: [
+      'pop est 2026',
+      'populacao total (estimativa - 2026)',
+      'estimativa 2026',
+      'populacao total (estimativa - 2025)',
+      'estimativa 2025'
+    ],
     exclude: ['indigen', 'quilom', 'mulher', 'homem', 'masculin', 'feminin', 'rural', 'urb']
   },
   pop_indigena: {
@@ -58,7 +75,7 @@ const FIELD_HINTS: Record<string, FieldHint> = {
   total_mun: {
     names: ['total_mun', 'qtd_mun', 'qt_mun', 'n_municipios', 'num_municipios', 'qtd_municipios', 'mun'],
     phrases: ['total mun', 'qtd mun'],
-    exclude: ['embasa', 'abastec', 'esgot']
+    exclude: ['embasa', 'abastec', 'esgot', 'pop_est', 'estimat', 'populac']
   },
   a_tot: {
     names: ['aba_total', 'aa_total', 'a_tot', 'aa_tot'],
@@ -293,6 +310,38 @@ export function pickSemiaridoById (
   return best?.value ?? null
 }
 
+function attrByFieldName (attrs: Record<string, any>, want: string): any {
+  if (!attrs || !want) return undefined
+  if (attrs[want] != null && attrs[want] !== '') return attrs[want]
+  const wantKey = normalizeKey(want)
+  for (const [key, value] of Object.entries(attrs)) {
+    if (normalizeKey(key) === wantKey) return value
+  }
+  return undefined
+}
+
+const POP_EST_2026_NAMES = [
+  'pop_est_2026',
+  'estimativa_pop_2026',
+  'populacao_estimada_2026',
+  'pop_2026'
+]
+
+export function pickSemiaridoPopEst2026 (record: SemiaridoRecord | null): number | null {
+  if (!record) return null
+  for (const name of POP_EST_2026_NAMES) {
+    const value = toNumber(attrByFieldName(record.attrs, name))
+    if (value != null && value > 0) return value
+  }
+  for (const field of record.fields || []) {
+    if (normalizeKey(field?.name || '') === 'popest2026' || normalizeKey(field?.alias || '') === 'popest2026') {
+      const value = toNumber(attrByFieldName(record.attrs, field.name))
+      if (value != null && value > 0) return value
+    }
+  }
+  return pickSemiaridoById(record, 'pop_total')
+}
+
 let cache: { webMap: any, record: SemiaridoRecord } | null = null
 
 export function clearSemiaridoRecordCache (): void {
@@ -307,30 +356,39 @@ export async function loadSemiaridoRecord (webMap: any): Promise<SemiaridoRecord
   const layer = findSemiaridoLayer(webMap)
   if (!layer || typeof layer.queryFeatures !== 'function') return null
 
-  await layer.load?.()
-  const query = typeof layer.createQuery === 'function' ? layer.createQuery() : {}
-  query.where = '1=1'
-  query.returnGeometry = false
-  query.outFields = ['*']
-  query.num = 1
+  try {
+    await layer.load?.()
+    const query = typeof layer.createQuery === 'function' ? layer.createQuery() : {}
+    query.where = '1=1'
+    query.returnGeometry = false
+    query.outFields = ['*']
+    query.num = 1
 
-  const result = await layer.queryFeatures(query)
-  const attrs = result?.features?.[0]?.attributes
-  if (!attrs) return null
+    const result = await layer.queryFeatures(query)
+    const attrs = result?.features?.[0]?.attributes
+    if (!attrs) return null
 
-  const record: SemiaridoRecord = {
-    attrs,
-    fields: layer.fields || [],
-    layer
+    const record: SemiaridoRecord = {
+      attrs,
+      fields: layer.fields || [],
+      layer
+    }
+    cache = { webMap, record }
+    return record
+  } catch (error) {
+    console.warn('[sihs-dash] Falha ao ler a Região Semiárida_BA:', error)
+    return null
   }
-  cache = { webMap, record }
-  return record
 }
 
 export function valueFromSemiaridoRecord (
   definition: IndicatorDefinition,
   record: SemiaridoRecord
 ): number | null {
+  if (definition.id === 'pop_total') {
+    return pickSemiaridoPopEst2026(record)
+  }
+
   const extras = [
     definition.filteredScope?.onStatisticField,
     definition.onStatisticField,

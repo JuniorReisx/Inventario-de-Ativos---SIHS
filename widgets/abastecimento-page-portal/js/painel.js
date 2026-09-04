@@ -556,12 +556,6 @@ function renderMap(){
       pathEl.classList.toggle('dim', !inFilter);
     }
   });
-
-  const legendHtml = [['100% adequado',0],['75%',25],['50%',50],['25%',75],['0% adequado',100]].map(([lbl,v])=>
-    `<span><span class="sw" style="background:${colorForPct(v)}"></span>${lbl}</span>`).join('') +
-    `<span><span class="sw" style="background:${MUN_FILL_NEUTRAL}"></span>Sem dado</span>`;
-  const legendSlot = document.querySelector('#view-'+state.tab+' .legend-slot');
-  if(legendSlot) legendSlot.innerHTML = legendHtml;
 }
 
 // ================= VIEW ÁGUA =================
@@ -623,14 +617,10 @@ function renderTabAgua(){
     <div class="kpi bom">${infoTip('Domicílios cuja forma principal de abastecimento é a rede geral de distribuição (SIDRA / Censo 2022).')}
       <div class="val">${fmt(v.aa_rede)}</div>
       <div class="sub">${fmt1(pctRede)}%</div>
-      ${vsBa?`<div class="sub vs-ba-kpi ${deltaClass(dRedeBa,true)}">${fmtDeltaVs(dRedeBa, 'Bahia')}</div>`:''}
-      ${dRedeTi!=null?`<div class="sub vs-ba-kpi ${deltaClass(dRedeTi,true)}">${fmtDeltaVs(dRedeTi, 'território')}</div>`:''}
       <div class="lbl">Possui ligação à rede geral e a utiliza como forma principal</div></div>
     <div class="kpi">${infoTip('Domicílios com ligação à rede geral que, no entanto, declaram outra forma como principal: quem possui ligação menos quem usa a rede como forma principal.')}
       <div class="val">${fmt(outraForma)}</div>
       <div class="sub">${fmt1(pctOutra)}%</div>
-      ${vsBa?`<div class="sub vs-ba-kpi ${deltaClass(dOutraBa,false)}">${fmtDeltaVs(dOutraBa, 'Bahia')}</div>`:''}
-      ${dOutraTi!=null?`<div class="sub vs-ba-kpi ${deltaClass(dOutraTi,false)}">${fmtDeltaVs(dOutraTi, 'território')}</div>`:''}
       <div class="lbl">Possui ligação à rede geral, mas utiliza principalmente outra forma</div></div>
   `;
 
@@ -690,8 +680,11 @@ function renderMuniDetail(){
   const meta = [p.territorio, p.semiarido==='SIM' ? 'Semiárido' : null].filter(Boolean).join(' · ');
   document.getElementById('muniDetailBody').innerHTML = `
     <p class="muni-detail-meta" title="${meta}">${meta}</p>
+    <div class="embasa-status is-${embasa.kind}" role="status">
+      <span class="embasa-status__brand">Embasa</span>
+      <strong class="embasa-status__value">${embasa.label}</strong>
+    </div>
     <div class="detail-grid">
-      <div class="detail-item is-embasa is-${embasa.kind}"><div class="v text">${embasa.label}</div><div class="l">Atendido pela Embasa</div></div>
       <div class="detail-item"><div class="v">${fmt(p.populacao)}</div><div class="l">População</div></div>
       <div class="detail-item"><div class="v">${fmt(p.aa_total)}</div><div class="l">Domicílios</div></div>
       <div class="detail-item wide"><div class="v text">${p.territorio}</div><div class="l">Território de Identidade</div></div>

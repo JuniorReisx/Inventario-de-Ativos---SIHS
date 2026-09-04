@@ -1,4 +1,4 @@
-import { resolveField } from './map'
+import { resolveField, resolvePopEstimadaField } from './map'
 
 function num (value: any): number {
   const n = Number(value)
@@ -40,7 +40,19 @@ function mapFeature (attrs: Record<string, any>, fields: {
       territorio: text(pick(attrs, fields.ti, 'territorio_de_indentidade', 'territorio_de_identidade')),
       // Valor inicial; sobrescrito por applySemiaridoFromKeys com Região Semiárida_BA
       semiarido: /sim/i.test(String(semiaridoRaw || '')) ? 'SIM' : 'NÃO',
-      populacao: num(pick(attrs, fields.pop, 'estimativa_pop_2025', 'pop_est_2025', 'pop_2025', 'população__2022_', 'populacao__2022_')),
+      populacao: num(pick(
+        attrs,
+        fields.pop,
+        'estimativa_pop_2026',
+        'pop_est_2026',
+        'populacao_estimada_2026',
+        'populacao_estimada',
+        'estimativa_pop_2025',
+        'pop_est_2025',
+        'pop_2025',
+        'população__2022_',
+        'populacao__2022_'
+      )),
       pessoas_indigenas: num(pick(attrs, 'pessoas_indigenas__2022_')),
       pessoas_quilombolas: num(pick(attrs, 'pessoas_quilombolas__2022_')),
       total_domicilios: num(pick(
@@ -88,17 +100,7 @@ export async function loadMunicipiosFromLayer (layer: any): Promise<{
     name: resolveField(layer, 'nome_do_municipio', 'nm_mun'),
     ti: resolveField(layer, 'territorio_de_indentidade', 'territorio'),
     semi: resolveField(layer, 'região_do_semiarida', 'regiao_do_semiarida'),
-    pop: resolveField(
-      layer,
-      'estimativa_pop_2025',
-      'pop_est_2025',
-      'estimativa_pop2025',
-      'populacao_estimada_2025',
-      'populacao total (estimativa - 2025)',
-      'pop_2025',
-      'população__2022_',
-      'populacao__2022_'
-    )
+    pop: resolvePopEstimadaField(layer)
   }
 
   // Preferir * para não perder campos SIDRA (aa_*) por mismatch de nome

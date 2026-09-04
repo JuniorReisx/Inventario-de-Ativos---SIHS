@@ -1279,6 +1279,52 @@
   overflow-wrap: anywhere;
 }
 
+.abas-painel .embasa-status{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  min-width: 0;
+}
+
+.abas-painel .embasa-status__brand{
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.abas-painel .embasa-status__value{
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.abas-painel .embasa-status.is-yes{
+  background: #e7f6ee;
+  border-color: #b6dfc6;
+  color: #0d6b4d;
+}
+
+.abas-painel .embasa-status.is-no{
+  background: #f8ece8;
+  border-color: #e4c4b8;
+  color: #8a3b2a;
+}
+
+.abas-painel .embasa-status.is-unknown{
+  background: #eef2f4;
+  border-color: #d5dee3;
+  color: #5b6b75;
+}
+
 .abas-painel .detail-grid{
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1310,14 +1356,6 @@
   font-size: 13px;
   font-weight: 700;
   line-height: 1.3;
-}
-
-.abas-painel .detail-item.is-embasa.is-yes .v{
-  color: #0d6b4d;
-}
-
-.abas-painel .detail-item.is-embasa.is-no .v{
-  color: #8a3b2a;
 }
 
 .abas-painel .detail-breakdown{

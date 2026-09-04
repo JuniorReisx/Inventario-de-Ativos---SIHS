@@ -135,7 +135,7 @@ export const STAT_CARDS = [
     label: "População total",
     layerTitle: "LIMITE_BAHIA",
     statisticType: "sum",
-    onStatisticField: "pop_est_2025",
+    onStatisticField: "pop_est_2026",
     size: "large",
     filteredScope: {
       layerTitle: "Limites Municipais",

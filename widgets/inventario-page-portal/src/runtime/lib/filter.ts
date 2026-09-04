@@ -169,33 +169,67 @@ export function pickLayerField (layer: any, ...candidates: string[]): string | n
   return null
 }
 
-/** Resolve o campo de população estimada 2025 na camada municipal (nome ou alias). */
+const POP_EST_FIELD_CANDIDATES = [
+  'pop_est_2026',
+  'estimativa_pop_2026',
+  'estimativa_pop2026',
+  'populacao_estimada_2026',
+  'pop_2026',
+  'populacao_estimada',
+  'pop_estimada',
+  'estimativa_pop_2025',
+  'pop_est_2025',
+  'estimativa_pop2025',
+  'populacao_estimada_2025',
+  'pop_2025'
+]
+
+function fieldSearchText (field: any): string {
+  return `${normalizeFieldText(field?.name || '')} ${normalizeFieldText(field?.alias || '')}`.trim()
+}
+
+function looksLikePopEstimadaField (field: any): boolean {
+  const text = fieldSearchText(field)
+  if (!text) return false
+  if (/indigen|quilom|mulher|feminin|homem|masculin|densidad|domicilio/.test(text)) return false
+  if (text.includes('2022') && !text.includes('2026') && !text.includes('2025') && !text.includes('estimativ')) {
+    return false
+  }
+  const hasPop = text.includes('populac') || /(^|[^a-z])pop([^a-z0-9]|$)/.test(text)
+  const hasEst = text.includes('estimativ') || text.includes('estimad')
+  const hasYear = text.includes('2026') || text.includes('2025')
+  return hasPop && (hasEst || hasYear)
+}
+
+/** Resolve o campo pop_est_2026 (população estimada IBGE 2026). */
 export function pickMunicipioPopEst2025Field (
   layer: any,
-  fallback = 'estimativa_pop_2025'
+  fallback = 'pop_est_2026'
 ): string {
-  const byName = pickLayerField(
-    layer,
-    'estimativa_pop_2025',
-    'pop_est_2025',
-    'estimativa_pop2025',
-    'populacao_estimada_2025'
-  )
+  const byExact = pickLayerField(layer, 'pop_est_2026', 'estimativa_pop_2026', 'populacao_estimada_2026', 'pop_2026')
+  if (byExact) return byExact
+
+  const fields: any[] = layer?.fields || []
+  const byAlias2026 = fields.find((field: any) => {
+    const text = fieldSearchText(field)
+    return text.includes('2026') && (text.includes('pop') || text.includes('estimativ') || text.includes('populac'))
+  })
+  if (byAlias2026?.name) return byAlias2026.name
+
+  const byName = pickLayerField(layer, ...POP_EST_FIELD_CANDIDATES)
   if (byName) return byName
 
-  const fields = layer?.fields || []
   const byAlias = fields.find((field: any) => {
     const alias = normalizeFieldText(field?.alias || '')
-    return alias === 'populacao total (estimativa - 2025)' ||
+    return alias === 'populacao estimada' ||
+      alias === 'populacao total (estimativa - 2026)' ||
+      alias === 'populacao total (estimativa 2026)' ||
+      alias === 'populacao total (estimativa - 2025)' ||
       alias === 'populacao total (estimativa 2025)'
   })
   if (byAlias?.name) return byAlias.name
 
-  const fuzzy = fields.find((field: any) => {
-    const text = `${normalizeFieldText(field?.name || '')} ${normalizeFieldText(field?.alias || '')}`
-    const isPop = text.includes('populac') || text.includes('pop')
-    return isPop && text.includes('estimativ') && text.includes('2025')
-  })
+  const fuzzy = fields.find((field: any) => looksLikePopEstimadaField(field))
   return fuzzy?.name || fallback
 }
 
