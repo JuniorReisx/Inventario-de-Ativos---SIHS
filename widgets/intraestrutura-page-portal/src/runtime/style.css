@@ -716,23 +716,58 @@
 
 /* ---------- Ficha do município (sidebar à direita do mapa) ---------- */
 
-.mun-popup[hidden] {
+.mun-popup-dock {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  z-index: 1200;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.mun-popup__expand {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 3.6rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #b7c4cf;
+  border-right: 0;
+  border-radius: 10px 0 0 10px;
+  background: #fff;
+  color: #002231;
+  cursor: pointer;
+  box-shadow: -6px 8px 20px rgba(0, 33, 59, 0.14);
+}
+
+.mun-popup__expand:hover {
+  background: #0a5c66;
+  color: #fff;
+  border-color: #0a5c66;
+}
+
+.mun-popup[hidden],
+.mun-popup:not(.is-open) {
   display: none !important;
 }
 
-.mun-popup {
+.mun-popup.is-open {
   --mun-navy: #002231;
   --mun-cyan: #2fc4ff;
   --mun-cyan-deep: #0a5c66;
   --mun-muted: #5d7380;
-  position: absolute;
-  top: 50%;
+  position: relative;
+  top: auto;
   right: 0.7rem;
   bottom: auto;
-  transform: translateY(-50%);
-  z-index: 50;
-  width: min(300px, calc(100% - 1.4rem));
-  max-height: min(72%, 520px);
+  transform: none;
+  z-index: 1200;
+  width: min(300px, calc(100vw - 3rem));
+  max-height: min(72vh, 520px);
   display: flex;
   flex-direction: column;
   pointer-events: auto;
@@ -858,6 +893,6 @@
 }
 
 @keyframes mun-sidebar-in {
-  from { opacity: 0; transform: translateY(-50%) translateX(18px); }
-  to   { opacity: 1; transform: translateY(-50%) translateX(0); }
+  from { opacity: 0; transform: translateX(18px); }
+  to   { opacity: 1; transform: translateX(0); }
 }

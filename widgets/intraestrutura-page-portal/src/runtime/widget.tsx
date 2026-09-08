@@ -65,6 +65,17 @@ interface AssetPopupState {
   error?: string
 }
 
+function popupDataFromMunicipio (item: MunicipioItem): MunicipioPopupData {
+  return {
+    nome: item.name,
+    territorio: item.territory || '—',
+    semiarido: item.semiarido || '—',
+    populacao: item.population,
+    codMun: null,
+    extraFields: []
+  }
+}
+
 const { useCallback, useEffect, useMemo, useRef, useState } = React
 
 function withPinnedAtivo (items: AtivoItem[], pinned: AtivoItem | null): AtivoItem[] {
@@ -370,11 +381,45 @@ const Widget = (props: AllWidgetProps<any>) => {
   }, [restoreAssetTypeFilter])
 
   const closeMunPopup = useCallback(() => {
+    setMunPopup((prev) => ({
+      ...prev,
+      open: false
+    }))
+  }, [])
+
+  const clearMunPopup = useCallback(() => {
     setMunPopup({
       open: false,
       data: null
     })
   }, [])
+
+  const reopenMunPopup = useCallback((event?: { stopPropagation?: () => void, preventDefault?: () => void }) => {
+    event?.stopPropagation?.()
+    event?.preventDefault?.()
+    const name = selectedNameRef.current
+    setMunPopup((prev) => {
+      const sameData = prev.data?.nome && name
+        ? prev.data.nome.localeCompare(name, 'pt-BR', { sensitivity: 'accent' }) === 0
+        : false
+      const item = name
+        ? municipios.find((entry) => entry.name.localeCompare(name, 'pt-BR', { sensitivity: 'accent' }) === 0)
+        : null
+      const data = sameData ? prev.data : item ? popupDataFromMunicipio(item) : prev.data
+      if (!data) return prev
+      return { open: true, data }
+    })
+  }, [municipios])
+
+  useEffect(() => {
+    if (!selectedName) return
+    setMunPopup((prev) => {
+      if (prev.data?.nome?.localeCompare(selectedName, 'pt-BR', { sensitivity: 'accent' }) === 0) return prev
+      const item = municipios.find((entry) => entry.name.localeCompare(selectedName, 'pt-BR', { sensitivity: 'accent' }) === 0)
+      if (!item) return prev
+      return { open: prev.open, data: popupDataFromMunicipio(item) }
+    })
+  }, [selectedName, municipios])
 
   const openMunPopup = useCallback((data: MunicipioPopupData) => {
     setMunPopup({
@@ -497,9 +542,12 @@ const Widget = (props: AllWidgetProps<any>) => {
     }
 
     document.addEventListener('keydown', onKeyDown)
-    document.addEventListener('click', onDocClick)
+    const handle = window.setTimeout(() => {
+      document.addEventListener('click', onDocClick)
+    }, 0)
 
     return () => {
+      window.clearTimeout(handle)
       document.removeEventListener('keydown', onKeyDown)
       document.removeEventListener('click', onDocClick)
     }
@@ -915,7 +963,7 @@ const Widget = (props: AllWidgetProps<any>) => {
     scopeGeometryRef.current = null
     setSelectedName(null)
     closeAssetPopup()
-    closeMunPopup()
+    clearMunPopup()
     const view = viewRef.current
     setZooming(true)
     try {
@@ -927,7 +975,7 @@ const Widget = (props: AllWidgetProps<any>) => {
     } finally {
       setZooming(false)
     }
-  }, [closeAssetPopup, closeMunPopup, restoreScopeView, applyScope])
+  }, [closeAssetPopup, clearMunPopup, restoreScopeView, applyScope])
 
   clearMunSelectionRef.current = () => { void clearSelection() }
 
@@ -980,10 +1028,11 @@ const Widget = (props: AllWidgetProps<any>) => {
         }),
         highlightWhere(view, layer, where).then(async () => {
           if (popupRequestRef.current !== requestId) return
+          const closeZoom = { scale: 2000 }
           if (item.geometry) {
-            await zoomToGeometry(view, item.geometry)
+            await zoomToGeometry(view, item.geometry, closeZoom)
           } else {
-            await zoomToWhere(view, layer, where)
+            await zoomToWhere(view, layer, where, closeZoom)
           }
           if (popupRequestRef.current !== requestId) {
             await restoreScopeView()
@@ -1126,6 +1175,13 @@ const Widget = (props: AllWidgetProps<any>) => {
     selectedNameRef.current = item.name
     setSelectedName(item.name)
     closeAssetPopup()
+    setMunPopup((prev) => {
+      const same = prev.data?.nome
+        ? prev.data.nome.localeCompare(item.name, 'pt-BR', { sensitivity: 'accent' }) === 0
+        : false
+      if (same || prev.open) return prev
+      return { open: false, data: popupDataFromMunicipio(item) }
+    })
     setListTab('municipios')
     setPage(0)
     setZooming(true)
@@ -1721,11 +1777,49 @@ const Widget = (props: AllWidgetProps<any>) => {
             : null}
           <div
             ref={munPopupRef}
-            className="mun-popup"
-            hidden={!munPopup.open}
-            role="complementary"
-            aria-label={munPopup.data?.nome ? `Município — ${munPopup.data.nome}` : 'Ficha do município'}
+            className="mun-popup-dock"
+            onPointerDown={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
           >
+            {selectedName && !munPopup.open && !selectedAtivoKey && !selectedSetorKey
+              ? (
+                <button
+                  type="button"
+                  className="mun-popup__expand"
+                  aria-label={`Abrir ficha de ${selectedName}`}
+                  title="Abrir ficha do município"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onMouseDown={(event) => {
+                    event.stopPropagation()
+                    event.preventDefault()
+                    reopenMunPopup(event)
+                  }}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    event.preventDefault()
+                    reopenMunPopup(event)
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                    <path
+                      d="M14.5 5.5 8 12l6.5 6.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+                )
+              : null}
+            <div
+              className={`mun-popup${munPopup.open ? ' is-open' : ''}`}
+              hidden={!munPopup.open}
+              role="complementary"
+              aria-label={munPopup.data?.nome ? `Município — ${munPopup.data.nome}` : 'Ficha do município'}
+            >
             <div className="mun-popup__card">
               {munPopup.data?.nome ? (
                 <>
@@ -1774,6 +1868,7 @@ const Widget = (props: AllWidgetProps<any>) => {
                   ) : null}
                 </>
               ) : null}
+            </div>
             </div>
           </div>
         </div>

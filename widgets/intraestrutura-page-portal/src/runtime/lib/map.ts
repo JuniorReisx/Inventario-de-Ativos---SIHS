@@ -167,13 +167,23 @@ export async function geometryContains (container: any, inner: any): Promise<boo
   }
 }
 
-export async function zoomToGeometry (view: any, geometry: any): Promise<boolean> {
+export async function zoomToGeometry (
+  view: any,
+  geometry: any,
+  options?: { scale?: number }
+): Promise<boolean> {
   if (!view || !geometry) return false
 
   const type = geometry.type
   const extent = resolveExtent(geometry)
+  const scale = options?.scale
   if (type === 'point' || type === 'multipoint' || isTinyExtent(extent)) {
-    await view.goTo({ target: geometry, scale: 50000 }, { duration: 900 })
+    await view.goTo({ target: geometry, scale: scale || 50000 }, { duration: 900 })
+    return true
+  }
+
+  if (scale) {
+    await view.goTo({ target: geometry, scale }, { duration: 900 })
     return true
   }
 
@@ -192,7 +202,12 @@ export async function withoutDefinitionExpression<T> (layer: any, run: () => Pro
   }
 }
 
-export async function zoomToWhere (view: any, layer: any, where = '1=1'): Promise<boolean> {
+export async function zoomToWhere (
+  view: any,
+  layer: any,
+  where = '1=1',
+  options?: { scale?: number }
+): Promise<boolean> {
   if (!view || !layer) return false
 
   await layer.load?.()
@@ -201,7 +216,7 @@ export async function zoomToWhere (view: any, layer: any, where = '1=1'): Promis
     if (typeof layer.queryExtent === 'function') {
       const result = await layer.queryExtent({ where })
       if (result?.extent && result.count !== 0 && !isTinyExtent(result.extent)) {
-        return zoomToGeometry(view, result.extent)
+        return zoomToGeometry(view, result.extent, options)
       }
     }
 
@@ -216,7 +231,7 @@ export async function zoomToWhere (view: any, layer: any, where = '1=1'): Promis
     const result = await layer.queryFeatures(query)
     const geometry = result?.features?.[0]?.geometry
     if (!geometry) return false
-    return zoomToGeometry(view, geometry)
+    return zoomToGeometry(view, geometry, options)
   })
 }
 
