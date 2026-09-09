@@ -275,7 +275,7 @@ const HeroInfraestrutura = () => {
           <h1 className="hero-infra__title">Infraestrutura Hídrica</h1>
           <span className="hero-infra__accent" aria-hidden="true" />
           <p className="hero-infra__subtitle">
-            Barragens, reservatórios e sistemas
+            Reservatórios, poços e sistemas de abastecimento
           </p>
         </div>
       </section>

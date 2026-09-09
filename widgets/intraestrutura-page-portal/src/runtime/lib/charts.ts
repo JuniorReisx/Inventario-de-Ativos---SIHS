@@ -86,6 +86,7 @@ export interface ChartView {
   items: ChartSlice[]
   status: 'loading' | 'ok' | 'empty' | 'error'
   message?: string
+  note?: string
 }
 
 export interface InfraChart {
@@ -126,7 +127,7 @@ export const CHART_DEFS = [
     layerTitle: 'Reservatórios',
     views: [
       { id: 'uso', subtitle: 'Uso principal', field: 'uso_princ', layout: 'pie' as const },
-      { id: 'empreendedores', subtitle: 'Empreendedores', field: 'empreendedor', layout: 'pie' as const, bucket: 'empreendedor' as const },
+      { id: 'empreendedores', subtitle: 'Empreendedores', field: 'empreendedor', layout: 'pie' as const, bucket: 'empreendedor' as const, note: 'Principais empreendedores, com mais de 15 reservatórios' },
       { id: 'porte', subtitle: 'Porte', field: 'capacidade_t', layout: 'pie' as const, bucket: 'porte' as const }
     ]
   },
@@ -443,21 +444,81 @@ function chunk <T>(items: T[], size: number): T[][] {
   return groups
 }
 
-function slicesFromFeatures (features: any[], field: string): ChartSlice[] {
-  return (features || [])
-    .map((feature: any) => {
+function domainLabel (layer: any, fieldName: string, raw: any): any {
+  try {
+    const field = typeof layer?.getField === 'function'
+      ? layer.getField(fieldName)
+      : (layer?.fields || []).find((item: any) => String(item?.name) === fieldName)
+    const coded = field?.domain?.codedValues as Array<{ code: any, name: string }> | undefined
+    if (!coded?.length) return raw
+    const match = coded.find((item) => String(item.code) === String(raw))
+    return match?.name ?? raw
+  } catch {
+    return raw
+  }
+}
+
+function chartCategoryLabel (raw: any, layer?: any, field?: string): string {
+  const resolved = field && layer ? domainLabel(layer, field, raw) : raw
+  if (resolved == null || resolved === '') return 'Não informado'
+  if (typeof resolved === 'number' && !Number.isFinite(resolved)) return 'Não informado'
+  const text = String(resolved).trim()
+  if (!text || isUninformedLabel(text)) return 'Não informado'
+  return formatChartLabel(text)
+}
+
+function isUninformedLabel (text: string): boolean {
+  const n = String(text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+  if (!n) return true
+  if (/^(nan|null|undefined|ni)$/.test(n)) return true
+  if (n.includes('nao informad')) return true
+  if (n === 'sem informacao' || n === 'sem informacoes') return true
+  if (n === 'sem dado' || n === 'sem dados') return true
+  return false
+}
+
+function isMostlyUppercase (text: string): boolean {
+  const letters = [...text].filter((ch) => ch.toLocaleLowerCase('pt-BR') !== ch.toLocaleUpperCase('pt-BR'))
+  if (letters.length < 2) return false
+  const upper = letters.filter((ch) => ch === ch.toLocaleUpperCase('pt-BR')).length
+  return upper / letters.length >= 0.75
+}
+
+function formatChartLabel (text: string): string {
+  if (!isMostlyUppercase(text)) return text
+  const lower = text.toLocaleLowerCase('pt-BR')
+  return lower.charAt(0).toLocaleUpperCase('pt-BR') + lower.slice(1)
+}
+
+function mergeSlices (items: ChartSlice[]): ChartSlice[] {
+  const counts = new Map<string, number>()
+  for (const item of items) {
+    const label = chartCategoryLabel(item.label)
+    const total = Number.isFinite(item.total) ? item.total : 0
+    if (total <= 0) continue
+    counts.set(label, (counts.get(label) || 0) + total)
+  }
+  return Array.from(counts.entries())
+    .map(([label, total]) => ({ label, total }))
+    .sort((a, b) => b.total - a.total)
+}
+
+function slicesFromFeatures (features: any[], field: string, layer?: any): ChartSlice[] {
+  return mergeSlices(
+    (features || []).map((feature: any) => {
       const attrs = feature.attributes || {}
-      const labelRaw = attrs[field]
       const total = Number(attrs.total ?? attrs.TOTAL ?? attrs.Total ?? 0)
       return {
-        label:
-          labelRaw == null || String(labelRaw).trim() === ''
-            ? 'Não informado'
-            : String(labelRaw).trim(),
+        label: chartCategoryLabel(attrs[field], layer, field),
         total: Number.isFinite(total) ? total : 0
       }
     })
-    .filter((item: ChartSlice) => item.total > 0)
+  )
 }
 
 async function queryBreakdownClient (
@@ -479,7 +540,7 @@ async function queryBreakdownClient (
     const features = result.features || []
     for (const feature of features) {
       const raw = feature.attributes?.[field]
-      const label = raw == null || String(raw).trim() === '' ? 'Não informado' : String(raw).trim()
+      const label = chartCategoryLabel(raw, layer, field)
       counts.set(label, (counts.get(label) || 0) + 1)
     }
     if (!features.length || !result.exceededTransferLimit) break
@@ -516,7 +577,7 @@ async function queryBreakdown (
         }
       ]
       const result = await layer.queryFeatures(query)
-      return slicesFromFeatures(result.features, field)
+      return slicesFromFeatures(result.features, field, layer)
     }
 
     try {
@@ -753,7 +814,8 @@ export function emptyCharts (status: ChartView['status'] = 'loading'): InfraChar
       field: view.field,
       layout: view.layout,
       items: [],
-      status
+      status,
+      note: 'note' in view ? view.note : undefined
     }))
   }))
 }
@@ -776,6 +838,7 @@ export async function loadInfraCharts (
       const layer = findLayer(webMap, { layerTitle: def.layerTitle })
       const views = await Promise.all(
         def.views.map(async (view) => {
+          const note = 'note' in view ? view.note : undefined
           if (!layer || typeof layer.queryFeatures !== 'function') {
             return {
               id: view.id,
@@ -784,7 +847,8 @@ export async function loadInfraCharts (
               layout: view.layout,
               items: [],
               status: 'error' as const,
-              message: `Camada ${def.layerTitle} não encontrada`
+              message: `Camada ${def.layerTitle} não encontrada`,
+              note
             }
           }
 
@@ -807,7 +871,8 @@ export async function loadInfraCharts (
                 layout: view.layout,
                 items: [],
                 status: 'error' as const,
-                message: 'Campo não encontrado nesta camada'
+                message: 'Campo não encontrado nesta camada',
+                note
               }
             }
 
@@ -832,7 +897,8 @@ export async function loadInfraCharts (
               layout: view.layout,
               items,
               status: hasData ? 'ok' as const : 'empty' as const,
-              message: hasData ? undefined : 'Sem dados para este recorte'
+              message: hasData ? undefined : 'Sem dados para este recorte',
+              note
             }
           } catch (error: any) {
             console.error(`[infra-page] Falha no gráfico ${def.title}:`, error)
@@ -843,7 +909,8 @@ export async function loadInfraCharts (
               layout: view.layout,
               items: [],
               status: 'error' as const,
-              message: 'Não foi possível carregar os dados deste recorte'
+              message: 'Não foi possível carregar os dados deste recorte',
+              note
             }
           }
         })

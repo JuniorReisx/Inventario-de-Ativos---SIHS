@@ -109,6 +109,7 @@ function formatDate (value: any): string | null {
 }
 
 function formatNumber (value: number): string {
+  if (!Number.isFinite(value)) return 'Sem dado'
   const abs = Math.abs(value)
   const decimals = abs >= 100 || Number.isInteger(value) ? 0 : abs >= 10 ? 1 : 2
   return new Intl.NumberFormat('pt-BR', {
@@ -133,12 +134,14 @@ function domainLabel (layer: any, fieldName: string, value: any): any {
 
 function formatValue (layer: any, fieldName: string, raw: any): string {
   const value = domainLabel(layer, fieldName, raw)
-  if (isEmpty(value)) return '—'
+  if (isEmpty(value)) return 'Sem dado'
+  if (typeof value === 'number' && !Number.isFinite(value)) return 'Sem dado'
   const asDate = formatDate(value)
   if (asDate) return asDate
   if (typeof value === 'number' && Number.isFinite(value)) return formatNumber(value)
   const text = String(value).trim()
-  return text || '—'
+  if (!text || /^nan$/i.test(text)) return 'Sem dado'
+  return text
 }
 
 function labelsClose (left: string, right: string): boolean {

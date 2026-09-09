@@ -29,13 +29,13 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
   
   function fmt(n){
     const v = Number(n);
-    if(!Number.isFinite(v)) return '0';
+    if(!Number.isFinite(v)) return 'Sem dado';
     if(Math.abs(v - Math.round(v)) < 1e-9) return Math.round(v).toLocaleString('pt-BR');
     return v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
   }
   function fmt1(n){
     const v = Number(n);
-    if(!Number.isFinite(v)) return '0,00';
+    if(!Number.isFinite(v)) return 'Sem dado';
     return v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
   }
   function sharePct(part, whole){
@@ -43,7 +43,8 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     return (Number(part)||0) / Number(whole) * 100;
   }
   function fmtShare(pct){
-    return pct==null ? '—' : fmt1(pct) + '%';
+    if(pct==null || !Number.isFinite(Number(pct))) return 'Sem dado';
+    return fmt1(pct) + '%';
   }
 
   function isEmbasaServed (value) {
@@ -121,11 +122,17 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
       out.total_domicilios += p.total_domicilios||0;
       AA_KEYS.forEach(k=> out[k] += p[k]||0);
     });
+    const sem = out.aa_sem_rede||0;
+    out.aa_total = sidraPossuiLigacao(out) + sem;
     return out;
   }
 
+  function sidraPossuiLigacao (v) {
+    return Math.max(0, (v.aa_total||0) - (v.aa_sem_rede||0));
+  }
+
   function totalDomicilios (v) {
-    return (v.total_domicilios||0) > 0 ? v.total_domicilios : (v.aa_total||0);
+    return sidraPossuiLigacao(v) + (v.aa_sem_rede||0);
   }
   
   function classifyAa(v){
@@ -173,9 +180,30 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     if(state.regiao!=='todas') feats = feats.filter(f=>f.properties.territorio===state.regiao);
     return feats;
   }
+  function currentScopeTitle(){
+    if(state.selectedMun){
+      const f = GEO.features.find(x=>x.properties.cod_mun===state.selectedMun);
+      return f?f.properties.nm_mun:state.selectedMun;
+    }
+    if(state.semiOn && state.regiao==='todas'){
+      return 'Região Semiárida';
+    }
+    if(state.regiao!=='todas'){
+      return state.regiao;
+    }
+    return 'Estado da Bahia';
+  }
+
+  function currentScopeKicker(){
+    if(state.selectedMun) return 'Município';
+    if(state.semiOn && state.regiao==='todas') return 'Recorte atual';
+    if(state.regiao!=='todas') return state.semiOn ? 'Território · Semiárido' : 'Território de Identidade';
+    return 'Recorte atual';
+  }
+
   function currentSelectionLabel(){
     if(state.selectedMun){
-      const f = GEO.features.find(f=>f.properties.cod_mun===state.selectedMun);
+      const f = GEO.features.find(x=>x.properties.cod_mun===state.selectedMun);
       return 'Município — ' + (f?f.properties.nm_mun:state.selectedMun);
     }
     if(state.semiOn && state.regiao==='todas'){
@@ -559,13 +587,14 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
       if(state.selectedMun){
         pathEl.setAttribute('fill', isSelected ? refColor : MUN_FILL_GRAYOUT);
         pathEl.classList.toggle('selected', isSelected);
-        pathEl.classList.remove('dim');
+        pathEl.classList.remove('dim', 'in-territorio');
       } else {
         pathEl.setAttribute('fill', refColor);
         pathEl.classList.remove('selected');
         const inFilter = (state.regiao==='todas' || p.territorio===state.regiao)
           && (!state.semiOn || p.semiarido==='SIM');
         pathEl.classList.toggle('dim', !inFilter);
+        pathEl.classList.toggle('in-territorio', inFilter && state.regiao !== 'todas');
       }
     });
   }
@@ -854,37 +883,55 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     const v = sumAa(feats);
     const cl = classifyAa(v);
     const pop = feats.reduce((s,f)=>s+(f.properties.populacao||0),0);
-    const comForma = Math.max(0, (v.aa_total||0) - (v.aa_sem_rede||0));
+    const comForma = sidraPossuiLigacao(v);
     const outraForma = Math.max(0, comForma - (v.aa_rede||0));
-    const pctCom = v.aa_total ? comForma/v.aa_total*100 : 0;
-    const pctSem = v.aa_total ? (v.aa_sem_rede||0)/v.aa_total*100 : 0;
-    const pctRede = v.aa_total ? (v.aa_rede||0)/v.aa_total*100 : 0;
-    const pctOutra = v.aa_total ? outraForma/v.aa_total*100 : 0;
+    const totSidra = totalDomicilios(v);
+    const pctCom = totSidra ? comForma/totSidra*100 : 0;
+    const pctSem = totSidra ? (v.aa_sem_rede||0)/totSidra*100 : 0;
+    const pctRede = totSidra ? (v.aa_rede||0)/totSidra*100 : 0;
+    const pctOutra = totSidra ? outraForma/totSidra*100 : 0;
   
     const bahiaV = sumAa(GEO.features);
     const bahiaCl = classifyAa(bahiaV);
     const terr = getTerritorioContext();
   
+    const pctUsaLig = comForma ? (v.aa_rede||0)/comForma*100 : 0;
+    const pctOutraLig = comForma ? outraForma/comForma*100 : 0;
     const kpiRow = qs('#'+'kpiRow-agua');
     if (kpiRow) kpiRow.innerHTML = `
-      <div class="kpi">${infoTip('Quantidade de municípios incluídos no filtro ou município atualmente selecionado.')}
-        <div class="val">${fmt(feats.length)}</div><div class="lbl">Municípios na seleção</div></div>
-      <div class="kpi">${infoTip('População estimada IBGE 2026 somada dos municípios da seleção.')}
-        <div class="val">${fmt(pop)}</div><div class="lbl">População (estimativa 2026)</div></div>
-      <div class="kpi">${infoTip('Total de domicílios particulares permanentes recenseados no recorte (Censo IBGE 2022 · DPA Indicadores: total_domicílios_recenseados / dom_rec_2022).')}
-        <div class="val">${fmt(totalDomicilios(v))}</div><div class="lbl">Total de domicílios</div></div>
-      <div class="kpi bom">${infoTip('Domicílios que possuem ligação à rede geral de distribuição (SIDRA): total menos a categoria “não possui ligação à rede geral”.')}
-        <div class="val">${fmt(comForma)}</div><div class="sub">${fmt1(pctCom)}%</div><div class="lbl">Possui ligação à rede geral</div></div>
-      <div class="kpi alerta">${infoTip('Domicílios sem ligação à rede geral de distribuição, conforme SIDRA/Censo 2022.')}
-        <div class="val">${fmt(v.aa_sem_rede)}</div><div class="sub">${fmt1(pctSem)}%</div><div class="lbl">Sem ligação à rede geral</div></div>
-      <div class="kpi bom">${infoTip('Domicílios cuja forma principal de abastecimento é a rede geral de distribuição (SIDRA / Censo 2022, campo de ligação à rede geral).')}
-        <div class="val">${fmt(v.aa_rede)}</div>
-        <div class="sub">${fmt1(pctRede)}%</div>
-        <div class="lbl">Possui ligação à rede geral e a utiliza como forma principal</div></div>
-      <div class="kpi">${infoTip('Domicílios com ligação à rede geral que, no entanto, declaram outra forma como principal (SIDRA): quem possui ligação menos quem usa a rede como forma principal.')}
-        <div class="val">${fmt(outraForma)}</div>
-        <div class="sub">${fmt1(pctOutra)}%</div>
-        <div class="lbl">Possui ligação à rede geral, mas utiliza principalmente outra forma</div></div>
+      <article class="ligacao-group">
+        <header class="ligacao-group__head">
+          ${infoTip('Domicílios que possuem ligação à rede geral de distribuição (SIDRA): total menos a categoria “não possui ligação à rede geral”.')}
+          <p class="ligacao-group__label">Possui ligação à rede geral</p>
+          <p class="ligacao-group__value">${fmt(comForma)}</p>
+          <p class="ligacao-group__share">${fmt1(pctCom)}% dos domicílios ocupados</p>
+        </header>
+        <p class="ligacao-group__caption">Desses, a forma principal de abastecimento é:</p>
+        <div class="ligacao-split" aria-hidden="true">
+          <span style="width:${Math.max(2, pctUsaLig)}%"></span>
+          <span style="width:${Math.max(2, pctOutraLig)}%"></span>
+        </div>
+        <div class="ligacao-group__parts">
+          <div class="ligacao-part">
+            ${infoTip('Domicílios cuja forma principal de abastecimento é a rede geral de distribuição (SIDRA / Censo 2022).')}
+            <p class="ligacao-part__name">Usa a rede como forma principal</p>
+            <p class="ligacao-part__value">${fmt(v.aa_rede)}</p>
+            <p class="ligacao-part__share">${fmt1(pctUsaLig)}% de quem tem ligação</p>
+          </div>
+          <div class="ligacao-part is-alt">
+            ${infoTip('Domicílios com ligação à rede geral que declaram outra forma como principal: quem possui ligação menos quem usa a rede como forma principal.')}
+            <p class="ligacao-part__name">Tem ligação, mas usa outra forma</p>
+            <p class="ligacao-part__value">${fmt(outraForma)}</p>
+            <p class="ligacao-part__share">${fmt1(pctOutraLig)}% de quem tem ligação</p>
+          </div>
+        </div>
+      </article>
+      <article class="ligacao-peer">
+        ${infoTip('Domicílios sem ligação à rede geral de distribuição, conforme SIDRA/Censo 2022.')}
+        <p class="ligacao-group__label">Sem ligação à rede geral</p>
+        <p class="ligacao-group__value">${fmt(v.aa_sem_rede)}</p>
+        <p class="ligacao-group__share">${fmt1(pctSem)}% dos domicílios ocupados</p>
+      </article>
     `;
   
     const colors = categoryColors(AA_COMP_CATS);
@@ -908,28 +955,77 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
   // ================= município: detalhe =================
   function renderMuniDetail(){
     const panel = qs('#'+'muniDetailPanel');
-    if(!state.selectedMun){ panel.style.display='none'; return; }
-    const f = GEO.features.find(f=>f.properties.cod_mun===state.selectedMun);
-    if(!f){ panel.style.display='none'; return; }
-    const p = f.properties;
-    panel.style.display='';
-  
-    qs('#'+'muniDetailName').textContent = p.nm_mun;
-  
-    const embasa = embasaAguaStatus(p.embasa_agua);
-    const meta = [p.territorio, p.semiarido==='SIM' ? 'Semiárido' : null].filter(Boolean).join(' · ');
-    qs('#'+'muniDetailBody').innerHTML = `
-      <p class="muni-detail-meta" title="${meta}">${meta}</p>
-      <div class="embasa-status is-${embasa.kind}" role="status">
-        <span class="embasa-status__brand">Embasa</span>
-        <strong class="embasa-status__value">${embasa.label}</strong>
-      </div>
-      <div class="detail-grid">
-        <div class="detail-item"><div class="v">${fmt(p.populacao)}</div><div class="l">População</div></div>
-        <div class="detail-item"><div class="v">${fmt(p.aa_total)}</div><div class="l">Domicílios</div></div>
-        <div class="detail-item wide"><div class="v text">${p.territorio}</div><div class="l">Território de Identidade</div></div>
+    if(!panel) return;
+    panel.style.display = '';
+    const closeBtn = qs('#'+'muniDetailClose');
+    const titleEl = qs('#'+'muniDetailTitle');
+    const bodyEl = qs('#'+'muniDetailBody');
+    const feats = currentSelectionFeatures();
+    const v = sumAa(feats);
+    const pop = feats.reduce((s,f)=>s+(f.properties.populacao||0),0);
+    const kickerEl = panel.querySelector('.recorte-panel__kicker');
+    const statsHtml = `
+      <div class="recorte-stats">
+        <div class="recorte-stat">
+          <span class="recorte-stat__label">
+            <span class="recorte-stat__name">Municípios</span>
+            ${infoTip('Quantidade de municípios incluídos no recorte atual.')}
+          </span>
+          <strong class="recorte-stat__value">${fmt(feats.length)}</strong>
+        </div>
+        <div class="recorte-stat">
+          <span class="recorte-stat__label">
+            <span class="recorte-stat__name">População</span>
+            ${infoTip('Estimativa IBGE 2026 somada dos municípios do recorte.')}
+            <span class="recorte-stat__hint">2026</span>
+          </span>
+          <strong class="recorte-stat__value">${fmt(pop)}</strong>
+        </div>
+        <div class="recorte-stat">
+          <span class="recorte-stat__label">
+            <span class="recorte-stat__name">Domicílios ocupados</span>
+            ${infoTip('SIDRA 6803: soma de quem possui ligação à rede geral e de quem não possui.')}
+            <span class="recorte-stat__hint">SIDRA</span>
+          </span>
+          <strong class="recorte-stat__value">${fmt(totalDomicilios(v))}</strong>
+        </div>
       </div>
     `;
+
+    if(kickerEl) kickerEl.textContent = currentScopeKicker();
+    if(titleEl) titleEl.textContent = currentScopeTitle();
+
+    if(state.selectedMun){
+      const f = GEO.features.find(x=>x.properties.cod_mun===state.selectedMun);
+      const p = f?.properties;
+      if(closeBtn){
+        closeBtn.hidden = false;
+        closeBtn.classList.add('visible');
+      }
+      if(!p){
+        if(bodyEl) bodyEl.innerHTML = statsHtml;
+        return;
+      }
+      const embasa = embasaAguaStatus(p.embasa_agua);
+      const meta = [p.territorio, p.semiarido==='SIM' ? 'Semiárido' : null].filter(Boolean).join(' · ');
+      if(bodyEl) bodyEl.innerHTML = `
+        ${statsHtml}
+        <div class="recorte-extra">
+          <p class="muni-detail-meta" title="${meta}">${meta}</p>
+          <div class="embasa-status is-${embasa.kind}" role="status">
+            <span class="embasa-status__brand">Embasa</span>
+            <strong class="embasa-status__value">${embasa.label}</strong>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    if(closeBtn){
+      closeBtn.hidden = true;
+      closeBtn.classList.remove('visible');
+    }
+    if(bodyEl) bodyEl.innerHTML = statsHtml;
   }
   
   function renderCurrentTab(){
@@ -1032,15 +1128,15 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     const f = GEO.features.find(f=>f.properties.cod_mun===codMun);
     qs('#'+'muniSearch-agua').value = f?f.properties.nm_mun:'';
     updateMuniSelectionUI();
-    zoomToMunicipio(codMun);
     renderCurrentTab();
+    zoomToMunicipio(codMun);
   }
   function clearMunicipio(){
     state.selectedMun = null;
     qs('#'+'muniSearch-agua').value = '';
     updateMuniSelectionUI();
-    zoomToRegiao();
     renderCurrentTab();
+    zoomToRegiao();
   }
   function applyRegiaoFilter(nome){
     state.regiao = nome;
@@ -1048,8 +1144,8 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     qs('#'+'muniSearch-agua').value = '';
     updateMuniSelectionUI();
     renderControls();
-    zoomToRegiao();
     renderCurrentTab();
+    zoomToRegiao();
   }
   
   async function exportRelatorioPdf(){
@@ -1094,7 +1190,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
         kpis: [
           { label: 'Municípios na seleção', value: fmt(feats.length) },
           { label: 'População (estimativa 2026)', value: fmt(pop) },
-          { label: 'Total de domicílios', value: fmt(totalDomicilios(v)) },
+          { label: 'Total de domicílios ocupados', value: fmt(totalDomicilios(v)) },
           { label: 'Possui ligação à rede geral', value: fmt(comForma), sub: fmt1(pctCom)+'%' },
           { label: 'Sem ligação à rede geral', value: fmt(v.aa_sem_rede), sub: fmt1(pctSem)+'%' },
           { label: 'Possui ligação à rede geral e a utiliza como forma principal', value: fmt(v.aa_rede), sub: fmt1((v.aa_total ? (v.aa_rede||0)/v.aa_total*100 : 0))+'%' },
@@ -1154,7 +1250,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
               colWeights: [1.15, 2.35],
               rows: [
                 ['População', 'Estimativa IBGE 2026 · DPA Indicadores (população estimada)'],
-                ['Total de domicílios', 'Censo IBGE 2022 · DPA Indicadores (total_domicílios_recenseados / dom_rec_2022)'],
+                ['Total de domicílios ocupados', 'SIDRA tabela 6803 · DPA Indicadores: possui ligação à rede geral + sem ligação à rede geral'],
                 ['Municípios na seleção', 'Contagem do recorte no mapa · DPA_Indicadores_Censo_2022'],
                 ['Rede, poço profundo, poço raso, fonte, pipa, chuva, rio e outra forma', 'SIDRA tabela 6803 · Censo IBGE 2022 · DPA Indicadores (campos aa_*)'],
                 ['Sem ligação à rede geral', 'SIDRA tabela 6803 · DPA Indicadores (aa_npl_rg)'],

@@ -68,7 +68,7 @@ function ClassMapPanel (props: {
   const munPopupHandleRef = useRef<{ remove: () => void } | null>(null)
   const munPopupRef = useRef<HTMLDivElement>(null)
   const rankRef = useRef<HTMLElement>(null)
-  const [legendOpen, setLegendOpen] = useState(true)
+  const [legendOpen, setLegendOpen] = useState(false)
   const [munPopup, setMunPopup] = useState<{
     open: boolean
     data: MunicipioPopupData | null
@@ -381,7 +381,7 @@ function ClassMapPanel (props: {
               <em>1º</em>
               <span>
                 <strong>{ranking[0].name}</strong>
-                lidera com {ranking[0].total.toLocaleString('pt-BR')} {ranking[0].total === 1 ? props.config.unitSingular : props.config.unitPlural}
+                lidera com {Number.isFinite(ranking[0].total) ? ranking[0].total.toLocaleString('pt-BR') : 'Sem dado'} {ranking[0].total === 1 ? props.config.unitSingular : props.config.unitPlural}
               </span>
             </p>
             )
@@ -448,7 +448,7 @@ function ClassMapPanel (props: {
                         <span style={{ width: `${Math.max(10, (item.total / Math.max(listMax, 1)) * 100)}%` }} />
                       </span>
                     </div>
-                    <b>{item.total.toLocaleString('pt-BR')}</b>
+                    <b>{Number.isFinite(item.total) ? item.total.toLocaleString('pt-BR') : 'Sem dado'}</b>
                   </button>
                 </li>
                 ))

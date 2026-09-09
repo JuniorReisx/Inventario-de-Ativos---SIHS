@@ -56,7 +56,7 @@ import {
   pickTerritorioCodeField,
   type DashboardFilter
 } from './lib/filter'
-import { formatValue, getKpiIconHtml } from './lib/format'
+import { formatPercent, formatValue, getKpiIconHtml } from './lib/format'
 import {
   loadSaneamentoSummaries,
   loadingSummaries,
@@ -238,7 +238,7 @@ async function resolveDualCount (
   const extraTotal = extraCounts.reduce((sum, n) => sum + (Number(n) || 0), 0)
   const total = geolocalized + extraTotal
 
-  const format = (n: number) => new Intl.NumberFormat('pt-BR').format(n)
+  const format = (n: number) => formatValue(n)
   const meta = String(dual.metaTemplate || '{geolocalized} geolocalizados')
     .replaceAll('{geolocalized}', format(geolocalized))
     .replaceAll('{total}', format(total))
@@ -1832,10 +1832,7 @@ const Widget = (props: AllWidgetProps<IMConfig>) => {
                             {pct >= 18
                               ? (
                                 <span className="chart-bar-hint">
-                                  {share.toLocaleString('pt-BR', {
-                                    minimumFractionDigits: 1,
-                                    maximumFractionDigits: 1
-                                  })}%
+                                  {formatPercent(share, 1)}
                                 </span>
                                 )
                               : null}
@@ -1843,10 +1840,7 @@ const Widget = (props: AllWidgetProps<IMConfig>) => {
                           {pct < 18
                             ? (
                               <span className="chart-bar-hint chart-bar-hint--out">
-                                {share.toLocaleString('pt-BR', {
-                                  minimumFractionDigits: 1,
-                                  maximumFractionDigits: 1
-                                })}%
+                                {formatPercent(share, 1)}
                               </span>
                               )
                             : null}
@@ -1855,14 +1849,6 @@ const Widget = (props: AllWidgetProps<IMConfig>) => {
                     )
                   })}
               </div>
-              {chartHasData
-                ? (
-                  <div className="chart-scale" aria-hidden="true">
-                    <span>0%</span>
-                    <span>100%</span>
-                  </div>
-                  )
-                : null}
             </div>
           </section>
         </main>
@@ -1983,9 +1969,9 @@ const Widget = (props: AllWidgetProps<IMConfig>) => {
                               : formatValue(data.highlightValue)}
                           </p>
                           <p className="saneamento-kpi__pct">
-                            {data.highlightPercent == null
-                              ? '—'
-                              : `${formatValue(data.highlightPercent, 1)}% dos domicílios`}
+                            {data.highlightPercent == null || !Number.isFinite(Number(data.highlightPercent))
+                              ? 'Sem dado'
+                              : `${formatPercent(data.highlightPercent, 1)} dos domicílios`}
                           </p>
                         </div>
                         <div className="saneamento-kpi saneamento-kpi--secondary">
@@ -1996,9 +1982,9 @@ const Widget = (props: AllWidgetProps<IMConfig>) => {
                               : formatValue(data.secondaryValue)}
                           </p>
                           <p className="saneamento-kpi__pct">
-                            {data.secondaryPercent == null
-                              ? '—'
-                              : `${formatValue(data.secondaryPercent, 1)}% dos domicílios`}
+                            {data.secondaryPercent == null || !Number.isFinite(Number(data.secondaryPercent))
+                              ? 'Sem dado'
+                              : `${formatPercent(data.secondaryPercent, 1)} dos domicílios`}
                           </p>
                         </div>
                       </div>
@@ -2016,8 +2002,8 @@ const Widget = (props: AllWidgetProps<IMConfig>) => {
                                 <strong>
                                   {data.status === 'loading'
                                     ? '—'
-                                    : metric.value == null
-                                      ? '—'
+                                    : metric.value == null || !Number.isFinite(Number(metric.value))
+                                      ? 'Sem dado'
                                       : formatValue(metric.value)}
                                 </strong>
                               </div>
@@ -2032,18 +2018,18 @@ const Widget = (props: AllWidgetProps<IMConfig>) => {
                                     background: metric.color
                                   }}
                                 >
-                                  {data.status !== 'loading' && metric.percent != null && pct >= 18
+                                  {data.status !== 'loading' && metric.percent != null && Number.isFinite(Number(metric.percent)) && pct >= 18
                                     ? (
                                       <span className="saneamento-bar-hint">
-                                        {formatValue(metric.percent, 1)}%
+                                        {formatPercent(metric.percent, 1)}
                                       </span>
                                       )
                                     : null}
                                 </div>
-                                {data.status !== 'loading' && metric.percent != null && pct < 18
+                                {data.status !== 'loading' && metric.percent != null && Number.isFinite(Number(metric.percent)) && pct < 18
                                   ? (
                                     <span className="saneamento-bar-hint saneamento-bar-hint--out">
-                                      {formatValue(metric.percent, 1)}%
+                                      {formatPercent(metric.percent, 1)}
                                     </span>
                                     )
                                   : null}
@@ -2051,10 +2037,6 @@ const Widget = (props: AllWidgetProps<IMConfig>) => {
                             </div>
                           )
                         })}
-                        <div className="chart-scale chart-scale--saneamento" aria-hidden="true">
-                          <span>0%</span>
-                          <span>100%</span>
-                        </div>
                       </div>
                     </>
                     )}

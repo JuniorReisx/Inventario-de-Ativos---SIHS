@@ -9,7 +9,7 @@ export default function MapLegend (props: {
   loading: boolean
   groups: AssetLegendGroup[]
 }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const total = props.groups.reduce((sum, group) => (
     group.showCount === false
       ? sum

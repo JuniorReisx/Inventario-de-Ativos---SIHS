@@ -173,12 +173,12 @@ const PainelAgua = ({ folderUrl }: { folderUrl: string }) => {
         <main>
           <div className="var-banner" role="note">
             <span className="var-banner-label">Variável</span>
-            Domicílios particulares permanentes ocupados <span className="var-banner-unit">(Unidades)</span>
+            Domicílios particulares permanentes ocupados <span className="var-banner-unit">(SIDRA 6803 · unidades)</span>
             <button type="button" id="btnExportPdf" className="btn-export-pdf">Exportar PDF</button>
           </div>
 
           <div className="view active" id="view-agua">
-            <div className="kpis kpis-bento" id="kpiRow-agua"></div>
+            <div className="ligacao-board" id="kpiRow-agua"></div>
 
             <div className="stage-row">
               <aside className="stage-filters">
@@ -246,12 +246,15 @@ const PainelAgua = ({ folderUrl }: { folderUrl: string }) => {
                   </div>
                 </div>
 
-                <div className="panel muni-detail-panel" id="muniDetailPanel" style={{ display: 'none' }}>
-                  <div className="panel-header">
-                    <span className="muni-detail-title">Município — <span id="muniDetailName"></span></span>
-                    <button type="button" id="muniDetailClose" className="btn-clear-muni visible" title="Desselecionar município">Fechar</button>
+                <div className="panel muni-detail-panel recorte-panel" id="muniDetailPanel">
+                  <div className="panel-header recorte-panel__head">
+                    <div className="recorte-panel__titles">
+                      <span className="recorte-panel__kicker">Recorte atual</span>
+                      <span className="muni-detail-title" id="muniDetailTitle">Estado da Bahia</span>
+                    </div>
+                    <button type="button" id="muniDetailClose" className="btn-clear-muni" title="Desselecionar município" hidden>Fechar</button>
                   </div>
-                  <div className="panel-body" id="muniDetailBody"></div>
+                  <div className="panel-body recorte-panel__body" id="muniDetailBody"></div>
                 </div>
               </aside>
 

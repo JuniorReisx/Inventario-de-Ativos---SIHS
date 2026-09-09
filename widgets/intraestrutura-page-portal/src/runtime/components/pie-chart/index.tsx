@@ -54,7 +54,29 @@ type PopoverPos = {
   placement: 'bottom' | 'top'
 }
 
+function displayLabel (label: string): string {
+  const text = String(label || '').trim()
+  if (!text) return 'Não informado'
+  const normalized = text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+  if (!normalized || /^(nan|null|undefined|ni)$/.test(normalized) || normalized.includes('nao informad') || normalized === 'sem informacao' || normalized === 'sem informacoes' || normalized === 'sem dado' || normalized === 'sem dados') {
+    return 'Não informado'
+  }
+  const letters = [...text].filter((ch) => ch.toLocaleLowerCase('pt-BR') !== ch.toLocaleUpperCase('pt-BR'))
+  const upper = letters.filter((ch) => ch === ch.toLocaleUpperCase('pt-BR')).length
+  if (letters.length >= 2 && upper / letters.length >= 0.75) {
+    const lower = text.toLocaleLowerCase('pt-BR')
+    return lower.charAt(0).toLocaleUpperCase('pt-BR') + lower.slice(1)
+  }
+  return text
+}
+
 function formatPercent (value: number): string {
+  if (!Number.isFinite(value)) return 'Sem dado'
   const digits = value > 0 && value < 1 ? 2 : 1
   return `${value.toLocaleString('pt-BR', {
     minimumFractionDigits: digits,
@@ -202,7 +224,7 @@ const PieChart = ({ chartId, items, preserveOrder = false }: PieChartProps) => {
   const rInner = 52
   const hoverOuter = 88
 
-  const centerTitle = active?.label || 'Total'
+  const centerTitle = active ? displayLabel(active.label) : 'Total'
   const centerValue = active ? active.total : total
   const centerPct = active ? formatPercent(active.percent) : null
 
@@ -239,7 +261,7 @@ const PieChart = ({ chartId, items, preserveOrder = false }: PieChartProps) => {
               return (
                 <li key={part.label}>
                   <span>
-                    {part.label}
+                    {displayLabel(part.label)}
                     {part.detail ? <small>{part.detail}</small> : null}
                   </span>
                   <b>{formatPopulation(part.total)}</b>
@@ -284,7 +306,7 @@ const PieChart = ({ chartId, items, preserveOrder = false }: PieChartProps) => {
                   tabIndex={0}
                 >
                   <title>
-                    {`${slice.label}: ${formatPopulation(slice.total)} ${unitFor(chartId, slice.total)} (${formatPercent(slice.percent)})`}
+                    {`${displayLabel(slice.label)}: ${formatPopulation(slice.total)} ${unitFor(chartId, slice.total)} (${formatPercent(slice.percent)})`}
                   </title>
                 </path>
               ))}
@@ -313,7 +335,7 @@ const PieChart = ({ chartId, items, preserveOrder = false }: PieChartProps) => {
               >
                 <i style={{ background: row.color }} />
                 <span>
-                  {row.label}
+                  {displayLabel(row.label)}
                   {row.detail ? <small>{row.detail}</small> : null}
                 </span>
                 <b>{formatPopulation(row.total)}</b>

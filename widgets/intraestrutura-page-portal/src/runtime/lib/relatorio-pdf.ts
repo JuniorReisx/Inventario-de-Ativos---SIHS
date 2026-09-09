@@ -39,6 +39,7 @@ export type RelatorioPdfInput = {
   fileName: string
   kpis: RelatorioKpi[]
   guide?: RelatorioGuide
+  compact?: boolean
   mapCaption?: string
   mapDataUrl?: string | null
   mapLegend?: RelatorioLegendGroup[]
@@ -376,7 +377,7 @@ export async function captureMapView (view: any): Promise<string | null> {
     })
     const shot = await view.takeScreenshot({
       format: 'jpg',
-      quality: 88
+      quality: 92
     })
     return shot?.dataUrl || null
   } catch (error) {
@@ -393,6 +394,105 @@ export function slugRelatorio (value: string): string {
     .replace(/^-+|-+$/g, '')
     .toLowerCase()
     .slice(0, 72) || 'selecao'
+}
+
+async function drawLegendSwatch (
+  ctx: CanvasRenderingContext2D,
+  item: RelatorioLegendItem,
+  x: number,
+  y: number,
+  size: number
+): Promise<void> {
+  ctx.fillStyle = '#ffffff'
+  roundRect(ctx, x, y, size, size, 3)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(28,43,51,0.16)'
+  ctx.lineWidth = 1
+  ctx.stroke()
+  let drewIcon = false
+  if (item.icon) {
+    try {
+      const img = await loadImage(item.icon)
+      const max = size - 4
+      const ratio = (img.width || 1) / (img.height || 1)
+      let dw = max
+      let dh = max
+      if (ratio > 1) dh = max / ratio
+      else dw = max * ratio
+      ctx.drawImage(img, x + (size - dw) / 2, y + (size - dh) / 2, dw, dh)
+      drewIcon = true
+    } catch {
+      drewIcon = false
+    }
+  }
+  if (!drewIcon) {
+    ctx.fillStyle = item.color || '#8aa0ab'
+    roundRect(ctx, x + 3, y + 3, size - 6, size - 6, 2)
+    ctx.fill()
+  }
+}
+
+async function paintLegendOnMap (
+  ctx: CanvasRenderingContext2D,
+  colors: (typeof THEMES)[RelatorioTheme],
+  groups: RelatorioLegendGroup[],
+  mapX: number,
+  mapY: number,
+  mapW: number,
+  mapH: number
+): Promise<void> {
+  const visible = groups.filter((group) => group.items?.length)
+  if (!visible.length) return
+
+  const boxW = Math.min(268, Math.max(180, mapW * 0.3))
+  const inner = 10
+  const rowH = 18
+  const groupTitleH = 16
+  let contentH = 20
+  for (const group of visible) {
+    if (group.title) contentH += groupTitleH
+    contentH += group.items.length * rowH + 6
+  }
+  const boxH = Math.min(mapH - 20, contentH + inner * 2)
+  const boxX = mapX + mapW - boxW - 12
+  const boxY = mapY + 12
+
+  ctx.save()
+  ctx.fillStyle = 'rgba(255,255,255,0.94)'
+  roundRect(ctx, boxX, boxY, boxW, boxH, 8)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(28,43,51,0.18)'
+  ctx.lineWidth = 1
+  ctx.stroke()
+  ctx.beginPath()
+  roundRect(ctx, boxX, boxY, boxW, boxH, 8)
+  ctx.clip()
+
+  ctx.fillStyle = colors.header2
+  ctx.font = '700 12px Segoe UI, Arial, sans-serif'
+  ctx.fillText('Legenda', boxX + inner, boxY + 16, boxW - inner * 2)
+
+  let y = boxY + 26
+  const maxY = boxY + boxH - 8
+  for (const group of visible) {
+    if (y + 14 > maxY) break
+    if (group.title) {
+      ctx.fillStyle = colors.header
+      ctx.font = '700 11px Segoe UI, Arial, sans-serif'
+      ctx.fillText(group.title, boxX + inner, y + 12, boxW - inner * 2)
+      y += groupTitleH
+    }
+    for (const item of group.items) {
+      if (y + rowH > maxY) break
+      await drawLegendSwatch(ctx, item, boxX + inner, y, 14)
+      ctx.fillStyle = '#2c3d47'
+      ctx.font = '11px Segoe UI, Arial, sans-serif'
+      ctx.fillText(item.label, boxX + inner + 20, y + 11, boxW - inner * 2 - 20)
+      y += rowH
+    }
+    y += 4
+  }
+  ctx.restore()
 }
 
 async function paintMapLegend (
@@ -491,50 +591,53 @@ export async function downloadRelatorioPdf (input: RelatorioPdfInput): Promise<v
   const generatedAt = new Date().toLocaleString('pt-BR')
   const ctx = () => painter.ctx
 
+  const compact = Boolean(input.compact)
+  const headerH = compact ? 108 : 138
   ctx().fillStyle = colors.header2
-  ctx().fillRect(0, 0, PAGE_W, 138)
+  ctx().fillRect(0, 0, PAGE_W, headerH)
   const gradient = ctx().createLinearGradient(0, 0, PAGE_W, 0)
   gradient.addColorStop(0, colors.header)
   gradient.addColorStop(1, colors.header2)
   ctx().fillStyle = gradient
-  ctx().fillRect(0, 0, PAGE_W, 138)
+  ctx().fillRect(0, 0, PAGE_W, headerH)
   ctx().fillStyle = '#ffffff'
-  ctx().font = '700 34px Segoe UI, Arial, sans-serif'
-  ctx().fillText(input.title, PAD, 52)
-  ctx().font = '600 20px Segoe UI, Arial, sans-serif'
-  ctx().fillText(input.scope, PAD, 86)
-  ctx().font = '16px Segoe UI, Arial, sans-serif'
+  ctx().font = compact ? '700 28px Segoe UI, Arial, sans-serif' : '700 34px Segoe UI, Arial, sans-serif'
+  ctx().fillText(input.title, PAD, compact ? 42 : 52)
+  ctx().font = compact ? '600 16px Segoe UI, Arial, sans-serif' : '600 20px Segoe UI, Arial, sans-serif'
+  ctx().fillText(input.scope, PAD, compact ? 68 : 86)
+  ctx().font = compact ? '14px Segoe UI, Arial, sans-serif' : '16px Segoe UI, Arial, sans-serif'
   ctx().fillStyle = 'rgba(255,255,255,0.86)'
-  ctx().fillText(input.source, PAD, 116)
-  painter.y = 168
+  ctx().fillText(input.source, PAD, compact ? 90 : 116)
+  painter.y = compact ? 128 : 168
 
-  painter.ensure(132)
+  const kpiH = compact ? 78 : 124
+  painter.ensure(kpiH + 8)
   const kpiCount = Math.max(1, input.kpis.length)
   const kpiW = (CONTENT_W - (kpiCount - 1) * 12) / kpiCount
   input.kpis.forEach((kpi, index) => {
     const x = PAD + index * (kpiW + 12)
     ctx().fillStyle = colors.kpi
-    roundRect(ctx(), x, painter.y, kpiW, 124, 12)
+    roundRect(ctx(), x, painter.y, kpiW, kpiH, 10)
     ctx().fill()
     ctx().strokeStyle = 'rgba(0,0,0,0.06)'
     ctx().stroke()
     ctx().fillStyle = colors.accent
-    ctx().font = '700 28px Segoe UI, Arial, sans-serif'
-    ctx().fillText(kpi.value, x + 14, painter.y + 46, kpiW - 28)
+    ctx().font = compact ? '700 22px Segoe UI, Arial, sans-serif' : '700 28px Segoe UI, Arial, sans-serif'
+    ctx().fillText(kpi.value, x + 14, painter.y + (compact ? 32 : 46), kpiW - 28)
     ctx().fillStyle = '#4f6470'
-    ctx().font = '15px Segoe UI, Arial, sans-serif'
-    wrapText(ctx(), kpi.label, kpiW - 28).slice(0, 2).forEach((line, lineIndex) => {
-      ctx().fillText(line, x + 14, painter.y + 72 + lineIndex * 19, kpiW - 28)
+    ctx().font = compact ? '13px Segoe UI, Arial, sans-serif' : '15px Segoe UI, Arial, sans-serif'
+    wrapText(ctx(), kpi.label, kpiW - 28).slice(0, compact ? 1 : 2).forEach((line, lineIndex) => {
+      ctx().fillText(line, x + 14, painter.y + (compact ? 54 : 72) + lineIndex * 18, kpiW - 28)
     })
-    if (kpi.sub) {
+    if (kpi.sub && !compact) {
       ctx().fillStyle = colors.header
       ctx().font = '600 15px Segoe UI, Arial, sans-serif'
       ctx().fillText(kpi.sub, x + 14, painter.y + 110, kpiW - 28)
     }
   })
-  painter.y += 144
+  painter.y += kpiH + (compact ? 14 : 20)
 
-  if (input.guide && input.guide.items.length) {
+  if (!compact && input.guide && input.guide.items.length) {
     ctx().font = '15px Segoe UI, Arial, sans-serif'
     const itemLines = input.guide.items.map((item, index) => (
       wrapText(ctx(), `${index + 1}. ${item}`, CONTENT_W - 32)
@@ -561,11 +664,12 @@ export async function downloadRelatorioPdf (input: RelatorioPdfInput): Promise<v
     painter.y += boxH + 18
   }
 
+  let legendOnMap = false
   if (input.mapDataUrl) {
     try {
       const img = await loadImage(input.mapDataUrl)
       const boxW = CONTENT_W
-      const maxH = 520
+      const maxH = compact ? 430 : 520
       const imgRatio = img.width / Math.max(1, img.height)
       let drawW = boxW
       let drawH = boxW / imgRatio
@@ -589,8 +693,17 @@ export async function downloadRelatorioPdf (input: RelatorioPdfInput): Promise<v
       ctx().fillStyle = '#d9e3ea'
       roundRect(ctx(), dx, painter.y, drawW, drawH, 10)
       ctx().fill()
+      ctx().save()
+      roundRect(ctx(), dx, painter.y, drawW, drawH, 10)
+      ctx().clip()
       ctx().drawImage(img, dx, painter.y, drawW, drawH)
-      painter.y += drawH + 24
+      ctx().restore()
+      const legendGroups = (input.mapLegend || []).filter((group) => group.items?.length)
+      if (legendGroups.length) {
+        await paintLegendOnMap(ctx(), colors, legendGroups, dx, painter.y, drawW, drawH)
+        legendOnMap = true
+      }
+      painter.y += drawH + (compact ? 14 : 24)
     } catch (_) {
       painter.ensure(32)
       ctx().fillStyle = '#8aa0ab'
@@ -600,21 +713,23 @@ export async function downloadRelatorioPdf (input: RelatorioPdfInput): Promise<v
     }
   }
 
-  await paintMapLegend(painter, ctx, colors, input)
+  if (!legendOnMap) {
+    await paintMapLegend(painter, ctx, colors, input)
+  }
 
   for (const section of input.sections) {
     const bars = (section.bars || []).filter((bar) => bar.label)
     const table = section.table
-    painter.ensure(56)
+    painter.ensure(compact ? 36 : 56)
     ctx().fillStyle = colors.header2
-    ctx().font = '700 22px Segoe UI, Arial, sans-serif'
+    ctx().font = compact ? '700 17px Segoe UI, Arial, sans-serif' : '700 22px Segoe UI, Arial, sans-serif'
     ctx().fillText(section.title, PAD, painter.y, CONTENT_W)
-    painter.y += 22
+    painter.y += compact ? 14 : 22
     ctx().fillStyle = colors.accent
-    ctx().fillRect(PAD, painter.y, 72, 3)
-    painter.y += 18
+    ctx().fillRect(PAD, painter.y, compact ? 48 : 72, 3)
+    painter.y += compact ? 10 : 18
 
-    if (section.note) {
+    if (section.note && !compact) {
       ctx().font = '15px Segoe UI, Arial, sans-serif'
       const noteLines = wrapText(ctx(), section.note, CONTENT_W - 28)
       const noteH = 20 + noteLines.length * 20
@@ -627,27 +742,33 @@ export async function downloadRelatorioPdf (input: RelatorioPdfInput): Promise<v
         ctx().fillText(line, PAD + 14, painter.y + 22 + lineIndex * 20, CONTENT_W - 28)
       })
       painter.y += noteH + 16
+    } else if (section.note && compact) {
+      ctx().font = '12px Segoe UI, Arial, sans-serif'
+      ctx().fillStyle = '#5b6b75'
+      const noteLines = wrapText(ctx(), section.note, CONTENT_W).slice(0, 1)
+      ctx().fillText(noteLines[0], PAD, painter.y + 12, CONTENT_W)
+      painter.y += 18
     }
 
     for (const bar of bars) {
-      painter.ensure(52)
+      painter.ensure(compact ? 36 : 52)
       ctx().fillStyle = '#1c2b33'
-      ctx().font = '600 16px Segoe UI, Arial, sans-serif'
+      ctx().font = compact ? '600 13px Segoe UI, Arial, sans-serif' : '600 16px Segoe UI, Arial, sans-serif'
       ctx().fillText(bar.label, PAD, painter.y)
       ctx().textAlign = 'right'
       ctx().fillStyle = '#4f6470'
-      ctx().font = '15px Segoe UI, Arial, sans-serif'
+      ctx().font = compact ? '12px Segoe UI, Arial, sans-serif' : '15px Segoe UI, Arial, sans-serif'
       ctx().fillText(`${bar.value}  ·  ${bar.pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`, PAGE_W - PAD, painter.y)
       ctx().textAlign = 'left'
-      painter.y += 10
+      painter.y += compact ? 6 : 10
       ctx().fillStyle = '#eef4f8'
-      roundRect(ctx(), PAD, painter.y, CONTENT_W, 12, 6)
+      roundRect(ctx(), PAD, painter.y, CONTENT_W, compact ? 8 : 12, 4)
       ctx().fill()
       const width = Math.max(2, Math.min(CONTENT_W, CONTENT_W * (Math.max(0, bar.pct) / 100)))
       ctx().fillStyle = bar.color || colors.accent
-      roundRect(ctx(), PAD, painter.y, width, 12, 6)
+      roundRect(ctx(), PAD, painter.y, width, compact ? 8 : 12, 4)
       ctx().fill()
-      painter.y += 30
+      painter.y += compact ? 18 : 30
     }
 
     if (table && table.headers.length) {
@@ -660,35 +781,37 @@ export async function downloadRelatorioPdf (input: RelatorioPdfInput): Promise<v
         xs.push(i === 0 ? PAD : xs[i - 1] + colW[i - 1])
         return xs
       }, [])
-      painter.ensure(38)
+      const headH = compact ? 26 : 36
+      painter.ensure(headH + 4)
       ctx().fillStyle = colors.header
-      roundRect(ctx(), PAD, painter.y, CONTENT_W, 36, 6)
+      roundRect(ctx(), PAD, painter.y, CONTENT_W, headH, 6)
       ctx().fill()
       ctx().fillStyle = '#ffffff'
-      ctx().font = '700 14px Segoe UI, Arial, sans-serif'
+      ctx().font = compact ? '700 12px Segoe UI, Arial, sans-serif' : '700 14px Segoe UI, Arial, sans-serif'
       table.headers.forEach((header, index) => {
-        ctx().fillText(header, colX[index] + 10, painter.y + 24, colW[index] - 16)
+        ctx().fillText(header, colX[index] + 8, painter.y + (compact ? 17 : 24), colW[index] - 12)
       })
-      painter.y += 36
+      painter.y += headH
       table.rows.forEach((row, rowIndex) => {
-        ctx().font = '15px Segoe UI, Arial, sans-serif'
-        const cellLines = row.map((cell, index) => wrapText(ctx(), String(cell ?? ''), colW[index] - 16))
+        ctx().font = compact ? '12px Segoe UI, Arial, sans-serif' : '15px Segoe UI, Arial, sans-serif'
+        const lineH = compact ? 14 : 19
+        const cellLines = row.map((cell, index) => wrapText(ctx(), String(cell ?? ''), colW[index] - 12).slice(0, compact ? 1 : 4))
         const lineCount = Math.max(1, ...cellLines.map((lines) => lines.length))
-        const rowH = Math.max(32, 14 + lineCount * 19)
+        const rowH = compact ? 22 : Math.max(32, 14 + lineCount * lineH)
         painter.ensure(rowH)
         ctx().fillStyle = rowIndex % 2 ? '#f7fafc' : '#ffffff'
         ctx().fillRect(PAD, painter.y, CONTENT_W, rowH)
         ctx().fillStyle = '#1c2b33'
         cellLines.forEach((lines, index) => {
           lines.forEach((line, lineIndex) => {
-            ctx().fillText(line, colX[index] + 10, painter.y + 21 + lineIndex * 19, colW[index] - 16)
+            ctx().fillText(line, colX[index] + 8, painter.y + (compact ? 15 : 21) + lineIndex * lineH, colW[index] - 12)
           })
         })
         painter.y += rowH
       })
-      painter.y += 18
+      painter.y += compact ? 10 : 18
     } else {
-      painter.y += 10
+      painter.y += compact ? 6 : 10
     }
   }
 

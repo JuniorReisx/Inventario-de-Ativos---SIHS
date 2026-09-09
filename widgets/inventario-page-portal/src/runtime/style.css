@@ -1916,21 +1916,6 @@
   opacity: 1;
 }
 
-.chart-scale {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 0.35rem;
-  padding: 0 1px;
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--ink-soft);
-}
-
-.chart-scale--saneamento {
-  margin-top: 0.45rem;
-}
-
 .chart-bar-share {
   font-size: 0.62rem;
   font-weight: 800;

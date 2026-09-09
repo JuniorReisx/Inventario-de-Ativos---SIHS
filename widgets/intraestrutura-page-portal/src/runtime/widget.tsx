@@ -32,6 +32,7 @@ import {
   ASSET_PAGE_SIZE,
   ativoWhere,
   searchAtivos,
+  listAtivosRelatorio,
   isAssetLayer,
   ativoFromFeature,
   hydrateAtivo,
@@ -1234,6 +1235,26 @@ const Widget = (props: AllWidgetProps<any>) => {
       const scoped = selectedName
         ? municipios.filter((item) => item.name === selectedName)
         : territorialMunicipios
+      const webMap = webMapRef.current
+      const listLimit = selectedName ? 18 : 80
+      const assetLists = webMap
+        ? await listAtivosRelatorio(webMap, {
+            selectedName,
+            maxPerKind: listLimit,
+            territorialWhere: (layer) => layerScopeWhere(layer, {
+              selectedName,
+              filterTerritorio,
+              filterSemiarido,
+              filteredNames,
+              scoped: Boolean(selectedName || filterTerritorio || semiRegionOn)
+            })
+          })
+        : { pocos: [], sistemas: [], truncated: { pocos: false, sistemas: false } }
+      const countByType = (rows: Array<{ assetType: string }>) => {
+        const counts = new Map<string, number>()
+        for (const row of rows) counts.set(row.assetType, (counts.get(row.assetType) || 0) + 1)
+        return Array.from(counts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'))
+      }
       const population = scoped.reduce((sum, item) => sum + (item.population || 0), 0)
       const semiCount = scoped.filter((item) => {
         const normalized = String(item.semiarido || '')
@@ -1247,7 +1268,55 @@ const Widget = (props: AllWidgetProps<any>) => {
         pocos: ['#14352c', '#1c4f40', '#246655', '#2d8268', '#3a9a78', '#5bb08c', '#84c5a6', '#b3dcc8'],
         sistemas: ['#001a2e', '#02364d', '#055a78', '#0a7fa3', '#1aa8c8', '#2fc4ff', '#6dd4ff', '#a8e6ff']
       }
-      const sections = charts.flatMap((chart) => {
+      const sections: Array<{
+        title: string
+        note?: string
+        bars?: Array<{ label: string, value: string, pct: number, color: string }>
+        table?: { headers: string[], rows: string[][], colWeights?: number[] }
+      }> = []
+      if (assetLists.pocos.length) {
+        sections.push(selectedName
+          ? {
+              title: 'Poços no recorte',
+              note: assetLists.truncated.pocos ? 'Lista limitada aos primeiros registros.' : undefined,
+              table: {
+                headers: ['Localidade', 'Tipo de ativo'],
+                colWeights: [1.2, 1.4],
+                rows: assetLists.pocos.map((row) => [row.locality, row.assetType])
+              }
+            }
+          : {
+              title: 'Poços no recorte — por tipo',
+              note: 'Resumo por tipo de ativo (ex.: Poço aproveitável).',
+              table: {
+                headers: ['Tipo de ativo', 'Quantidade'],
+                colWeights: [2, 0.7],
+                rows: countByType(assetLists.pocos).map(([label, total]) => [label, formatPopulation(total)])
+              }
+            })
+      }
+      if (assetLists.sistemas.length) {
+        sections.push(selectedName
+          ? {
+              title: 'Sistemas de abastecimento no recorte',
+              note: assetLists.truncated.sistemas ? 'Lista limitada aos primeiros registros.' : undefined,
+              table: {
+                headers: ['Localidade', 'Tipo de ativo'],
+                colWeights: [1.2, 1.4],
+                rows: assetLists.sistemas.map((row) => [row.locality, row.assetType])
+              }
+            }
+          : {
+              title: 'Sistemas no recorte — por tipo',
+              note: 'Resumo por tipo de ativo (ex.: Sistema simplificado).',
+              table: {
+                headers: ['Tipo de ativo', 'Quantidade'],
+                colWeights: [2, 0.7],
+                rows: countByType(assetLists.sistemas).map(([label, total]) => [label, formatPopulation(total)])
+              }
+            })
+      }
+      sections.push(...charts.flatMap((chart) => {
         const colors = palettes[chart.id] || palettes.sistemas
         return chart.views
           .filter((view) => view.status === 'ok' && (view.items || []).some((item) => item.total > 0))
@@ -1263,31 +1332,23 @@ const Widget = (props: AllWidgetProps<any>) => {
               pct: total ? item.total / total * 100 : 0,
               color: item.color || colors[index % colors.length]
             }))
+            const note = view.note || chart.note
             return {
-              title: chart.note
-                ? `${chart.title} — ${view.subtitle} (${chart.note})`
+              title: note
+                ? `${chart.title} — ${view.subtitle} (${note})`
                 : `${chart.title} — ${view.subtitle}`,
-              bars,
-              table: {
-                headers: ['Categoria', 'Quantidade', '%'],
-                rows: bars.map((bar) => [
-                  bar.label,
-                  bar.value,
-                  `${bar.pct.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
-                ])
-              }
+              bars
             }
           })
-      })
-      if (scoped.length && scoped.length <= 40) {
+      }))
+      if (scoped.length > 1 && scoped.length <= 12) {
         sections.push({
           title: 'Municípios no recorte',
           table: {
-            headers: ['Município', 'Território', 'Semiárido', 'População'],
+            headers: ['Município', 'Território', 'População'],
             rows: scoped.map((item) => [
               item.name,
               item.territory,
-              item.semiarido,
               formatPopulation(item.population)
             ])
           }
@@ -1337,7 +1398,11 @@ const Widget = (props: AllWidgetProps<any>) => {
     territorialMunicipios,
     scopeLabel,
     restoreScopeView,
-    legend
+    legend,
+    filterTerritorio,
+    filterSemiarido,
+    filteredNames,
+    semiRegionOn
   ])
 
   return (
@@ -1368,8 +1433,8 @@ const Widget = (props: AllWidgetProps<any>) => {
               <header className="infra-chart__head">
                 <p className="infra-chart__eyebrow">{active?.subtitle}</p>
                 <h3 className="infra-chart__title">{chart.title}</h3>
-                {chart.note
-                  ? <p className="infra-chart__note">{chart.note}</p>
+                {active?.note || chart.note
+                  ? <p className="infra-chart__note">{active?.note || chart.note}</p>
                   : null}
                 {chart.views.length > 1
                   ? (
@@ -1844,9 +1909,9 @@ const Widget = (props: AllWidgetProps<any>) => {
                     <div className="mun-popup__row">
                       <dt className="mun-popup__label">População</dt>
                       <dd className="mun-popup__value">
-                        {munPopup.data.populacao != null
+                        {munPopup.data.populacao != null && Number.isFinite(Number(munPopup.data.populacao))
                           ? new Intl.NumberFormat('pt-BR').format(Number(munPopup.data.populacao))
-                          : '—'}
+                          : 'Sem dado'}
                       </dd>
                     </div>
                     {munPopup.data.codMun ? (

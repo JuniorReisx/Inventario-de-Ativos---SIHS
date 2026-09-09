@@ -449,57 +449,6 @@ function paintSemiHighlight (highlightLayer: any, geometries: any[], on: boolean
   highlightLayer.effect = null
 }
 
-function selectionFillSymbol (fill: number[], outline: number[], width = 2.8) {
-  return {
-    type: 'simple-fill',
-    style: 'solid',
-    color: fill,
-    outline: { color: outline, width }
-  }
-}
-
-async function paintMunicipioSelection (
-  highlightLayer: any,
-  sourceLayer: any,
-  where: string | null,
-  colors: { fill: number[], outline: number[] }
-): Promise<void> {
-  if (!highlightLayer) return
-  highlightLayer.removeAll?.()
-  if (!where || !sourceLayer || typeof sourceLayer.queryFeatures !== 'function') {
-    highlightLayer.visible = false
-    return
-  }
-  try {
-    const previousWhere = sourceLayer.definitionExpression
-    sourceLayer.definitionExpression = null
-    const query = typeof sourceLayer.createQuery === 'function' ? sourceLayer.createQuery() : {}
-    query.where = where
-    query.returnGeometry = true
-    query.outFields = [sourceLayer.objectIdField || 'OBJECTID']
-    query.num = 1
-    const result = await sourceLayer.queryFeatures(query)
-    sourceLayer.definitionExpression = previousWhere
-    const geometry = result?.features?.[0]?.geometry
-    if (!geometry) {
-      highlightLayer.visible = false
-      return
-    }
-    highlightLayer.visible = true
-    highlightLayer.add({
-      geometry,
-      symbol: selectionFillSymbol(colors.fill, colors.outline, 3.2)
-    })
-    highlightLayer.add({
-      geometry,
-      symbol: selectionFillSymbol([0, 0, 0, 0], colors.outline, 1.4)
-    })
-  } catch (error) {
-    console.warn('[abastecimento] destaque do município falhou:', error)
-    highlightLayer.visible = false
-  }
-}
-
 export async function setupAuthentication (portalUrl = PORTAL_URL): Promise<void> {
   const [esriConfig] = await loadArcGISJSAPIModules(['esri/config'])
   esriConfig.portalUrl = normalizePortalUrl(portalUrl)
@@ -582,6 +531,13 @@ export async function createMapView (container: HTMLElement, webMap: any): Promi
   })
 
   await view.when()
+  try {
+    view.highlightOptions = {
+      color: [47, 182, 221, 1],
+      haloOpacity: 0.9,
+      fillOpacity: 0.16
+    }
+  } catch (_) {}
   await resizeMapView(view)
 
   const zoom = new Zoom({ view })
@@ -740,16 +696,31 @@ export function createMapApi (view: any, layer: any, options: {
     return '1=1'
   }
 
-  const munWhere = (codMun: string) => `${sqlField(codField)} = ${Number(codMun)}`
+  const munWhere = (codMun: string) => {
+    const raw = String(codMun || '').trim()
+    const num = Number(raw)
+    if (Number.isFinite(num) && num > 0) return `${sqlField(codField)} = ${Math.round(num)}`
+    return `${sqlField(codField)} = '${escapeSql(raw)}'`
+  }
 
   const zoomToWhere = async (where: string, targetLayer: any = layer, expand = 1.12, duration = 700) => {
-    if (!view || !targetLayer || typeof targetLayer.queryExtent !== 'function') return false
+    if (!view || !targetLayer) return false
     try {
-      const result = await targetLayer.queryExtent({ where })
-      if (!result?.extent || result.count === 0) return false
-      const target = typeof result.extent.expand === 'function'
-        ? result.extent.expand(expand)
-        : result.extent
+      let extent = null
+      if (typeof targetLayer.queryExtent === 'function') {
+        const result = await targetLayer.queryExtent({ where })
+        if (result?.extent && result.count !== 0) extent = result.extent
+      }
+      if (!extent && typeof targetLayer.queryFeatures === 'function') {
+        const query = typeof targetLayer.createQuery === 'function' ? targetLayer.createQuery() : {}
+        query.where = where
+        query.returnGeometry = true
+        query.num = 1
+        const result = await targetLayer.queryFeatures(query)
+        extent = result?.features?.[0]?.geometry?.extent || null
+      }
+      if (!extent) return false
+      const target = typeof extent.expand === 'function' ? extent.expand(expand) : extent
       await view.goTo(target, { duration })
       return true
     } catch (error) {
@@ -827,7 +798,6 @@ export function createMapApi (view: any, layer: any, options: {
     fill: [27, 95, 160, 0.38],
     outline: [255, 196, 0, 1]
   }
-  let selectionToken = 0
   let highlightHandle: { remove?: () => void } | null = null
 
   const clearLayerViewHighlight = () => {
@@ -835,53 +805,35 @@ export function createMapApi (view: any, layer: any, options: {
     highlightHandle = null
   }
 
-  const applyMunicipioHighlight = async (codMun: string | null) => {
-    const token = ++selectionToken
+  const applySelectionHighlight = (state: PainelMapState) => {
     clearLayerViewHighlight()
-    const where = codMun ? munWhere(codMun) : null
-    await paintMunicipioSelection(
-      options.selectionHighlightLayer,
-      layer,
-      where,
-      selectionColors
-    )
-    if (token !== selectionToken) return
-
     if (options.selectionHighlightLayer) {
-      bringLayerToFront(options.webMap, options.selectionHighlightLayer)
+      options.selectionHighlightLayer.removeAll?.()
+      options.selectionHighlightLayer.visible = false
     }
 
-    if (!codMun || !layer) {
-      if (layer) layer.featureEffect = null
+    const munWhereClause = state.selectedMun ? munWhere(state.selectedMun) : null
+    const tiWhere = (tiField && state.regiao && state.regiao !== 'todas')
+      ? `${sqlField(tiField)} = '${escapeSql(state.regiao)}'`
+      : null
+    const where = munWhereClause || tiWhere
+
+    if (!layer) return
+    if (!where) {
+      layer.featureEffect = null
       return
     }
-
     try {
       layer.featureEffect = {
-        filter: { where: munWhere(codMun) },
-        includedEffect: 'drop-shadow(0px, 0px, 10px, #ffc400)',
-        excludedEffect: 'opacity(32%)'
+        filter: { where },
+        includedEffect: munWhereClause
+          ? 'drop-shadow(0px, 0px, 18px, #2fb6dd) drop-shadow(0px, 0px, 4px, #0b2c3d) brightness(1.25) saturate(1.4)'
+          : 'drop-shadow(0px, 0px, 12px, #2fb6dd) brightness(1.12) saturate(1.2)',
+        excludedEffect: munWhereClause ? 'opacity(32%)' : 'opacity(40%)'
       }
     } catch (_) {
-      if (layer) layer.featureEffect = null
+      layer.featureEffect = null
     }
-
-    try {
-      const query = typeof layer.createQuery === 'function' ? layer.createQuery() : {}
-      query.where = munWhere(codMun)
-      query.returnGeometry = false
-      query.outFields = [layer.objectIdField || 'OBJECTID']
-      query.num = 1
-      const result = await layer.queryFeatures(query)
-      if (token !== selectionToken) return
-      const feature = result?.features?.[0]
-      if (!feature) return
-      const layerView = await view.whenLayerView(layer)
-      if (token !== selectionToken) return
-      if (typeof layerView?.highlight === 'function') {
-        highlightHandle = layerView.highlight(feature)
-      }
-    } catch (_) {}
   }
 
   const syncOverlayLayers = (state: PainelMapState) => {
@@ -903,7 +855,7 @@ export function createMapApi (view: any, layer: any, options: {
   return {
     sync (state: PainelMapState) {
       syncOverlayLayers(state)
-      void applyMunicipioHighlight(state.selectedMun || null)
+      applySelectionHighlight(state)
     },
 
     setMunicipios (items) {
@@ -916,7 +868,7 @@ export function createMapApi (view: any, layer: any, options: {
     },
 
     async zoomToMun (codMun: string) {
-      await zoomToWhere(munWhere(codMun))
+      await zoomToWhere(munWhere(codMun), layer, 1.55, 700)
     },
 
     async zoomToState (state: PainelMapState) {

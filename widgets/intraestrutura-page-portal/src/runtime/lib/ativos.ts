@@ -11,6 +11,8 @@ export interface AssetDef {
   layerTitle: string
   nameFields: string[]
   municipalityFields: string[]
+  localityFields?: string[]
+  typeFields?: string[]
 }
 
 export interface AtivoItem {
@@ -32,14 +34,18 @@ export const ASSET_DEFS: AssetDef[] = [
     title: 'Sistemas de Abastecimento',
     layerTitle: 'Sistemas de Abastecimento',
     nameFields: ['localidade', 'codigo', 'tipo_sistema', 'captacao', 'msb'],
-    municipalityFields: ['nm_mun', 'municipio_oficial', 'municipio']
+    municipalityFields: ['nm_mun', 'municipio_oficial', 'municipio'],
+    localityFields: ['localidade', 'localizacao', 'nome'],
+    typeFields: ['tipo_sistema', 'tipo', 'sistema']
   },
   {
     id: 'pocos',
     title: 'Poços',
     layerTitle: 'Poços',
     nameFields: ['localidade', 'localizacao', 'codigo', 'aquifero'],
-    municipalityFields: ['nm_mun', 'municipio']
+    municipalityFields: ['nm_mun', 'municipio'],
+    localityFields: ['localidade', 'localizacao', 'nome'],
+    typeFields: ['condicao', 'estado_qualitativo', 'situacao', 'tipo']
   },
   {
     id: 'reservatorios',
@@ -213,4 +219,147 @@ export async function searchAtivos (
     .flat()
     .filter((item) => ativoBelongsToMunicipio(item, options.selectedName))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+}
+
+export interface RelatorioAtivoRow {
+  locality: string
+  municipality: string
+  assetType: string
+}
+
+function isUninformedText (value: string): boolean {
+  const n = String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+  if (!n) return true
+  if (/^(nan|null|undefined|ni)$/.test(n)) return true
+  if (n.includes('nao informad')) return true
+  if (n === 'sem informacao' || n === 'sem informacoes') return true
+  if (n === 'sem dado' || n === 'sem dados') return true
+  return false
+}
+
+function sentenceCaseLabel (value: string): string {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  const letters = [...text].filter((ch) => ch.toLocaleLowerCase('pt-BR') !== ch.toLocaleUpperCase('pt-BR'))
+  const mostlyUpper = letters.length >= 2 &&
+    letters.filter((ch) => ch === ch.toLocaleUpperCase('pt-BR')).length / letters.length >= 0.75
+  if (!mostlyUpper) return text
+  const lower = text.toLocaleLowerCase('pt-BR')
+  return lower.charAt(0).toLocaleUpperCase('pt-BR') + lower.slice(1)
+}
+
+function domainName (layer: any, fieldName: string, raw: any): any {
+  if (raw == null || raw === '') return raw
+  try {
+    const field = typeof layer?.getField === 'function'
+      ? layer.getField(fieldName)
+      : (layer?.fields || []).find((item: any) => String(item?.name) === fieldName)
+    const coded = field?.domain?.codedValues as Array<{ code: any, name: string }> | undefined
+    if (!coded?.length) return raw
+    const match = coded.find((item) => String(item.code) === String(raw))
+    return match?.name ?? raw
+  } catch {
+    return raw
+  }
+}
+
+export function formatAssetTypeLabel (kind: 'pocos' | 'sistemas', raw: any, layer?: any, field?: string): string {
+  const resolved = field && layer ? domainName(layer, field, raw) : raw
+  const text = resolved == null ? '' : String(resolved).trim()
+  const label = !text || isUninformedText(text) ? 'Não informado' : sentenceCaseLabel(text)
+  const lower = label.toLocaleLowerCase('pt-BR')
+  if (kind === 'pocos') {
+    if (label === 'Não informado') return 'Poço — não informado'
+    if (lower.includes('poço') || lower.includes('poco')) return sentenceCaseLabel(label)
+    return `Poço ${lower}`
+  }
+  if (label === 'Não informado') return 'Sistema — não informado'
+  if (lower.includes('sistema')) return sentenceCaseLabel(label)
+  return `Sistema ${lower}`
+}
+
+export async function listAtivosRelatorio (
+  webMap: any,
+  options: {
+    selectedName?: string | null
+    territorialWhere: (layer: any) => string
+    maxPerKind?: number
+  }
+): Promise<{
+  pocos: RelatorioAtivoRow[]
+  sistemas: RelatorioAtivoRow[]
+  truncated: { pocos: boolean, sistemas: boolean }
+}> {
+  const maxPerKind = options.maxPerKind || 200
+  const kinds: Array<'pocos' | 'sistemas'> = ['pocos', 'sistemas']
+
+  const groups = await Promise.all(kinds.map(async (kind) => {
+    const def = ASSET_DEFS.find((entry) => entry.id === kind)
+    if (!def) return { kind, rows: [] as RelatorioAtivoRow[], truncated: false }
+
+    const layer = findLayer(webMap, { layerTitle: def.layerTitle })
+    if (!layer || typeof layer.queryFeatures !== 'function') {
+      return { kind, rows: [] as RelatorioAtivoRow[], truncated: false }
+    }
+
+    await layer.load?.()
+    const available = fieldSet(layer)
+    const localityFields = pickExisting(available, def.localityFields || def.nameFields)
+    const typeFields = pickExisting(available, def.typeFields || [])
+    const munFields = pickExisting(available, def.municipalityFields)
+    const territorial = options.territorialWhere(layer)
+    const where = territorial && territorial !== '1=1' ? territorial : '1=1'
+
+    const query = layer.createQuery()
+    query.where = where
+    query.returnGeometry = false
+    query.num = maxPerKind + 1
+    query.outFields = [
+      layer.objectIdField || 'objectid',
+      ...localityFields,
+      ...typeFields,
+      ...munFields
+    ]
+
+    const result = await layer.queryFeatures(query)
+    const features = result?.features || []
+    const truncated = features.length > maxPerKind
+    const rows = features.slice(0, maxPerKind).map((feature: any) => {
+      const attrs = feature?.attributes || {}
+      const locality = localityFields.map((field) => text(attrs[field])).find(Boolean) || '—'
+      const municipality = munFields.map((field) => text(attrs[field])).find(Boolean) || '—'
+      const typeField = typeFields[0]
+      const assetType = formatAssetTypeLabel(kind, typeField ? attrs[typeField] : '', layer, typeField)
+      return { locality, municipality, assetType }
+    }).filter((row) => {
+      if (!options.selectedName) return true
+      const mun = normalizeMunName(options.selectedName)
+      const value = normalizeMunName(row.municipality)
+      if (!mun) return true
+      if (!value || value === '-') return true
+      return value === mun
+    }).sort((a, b) => {
+      const loc = a.locality.localeCompare(b.locality, 'pt-BR')
+      if (loc) return loc
+      return a.assetType.localeCompare(b.assetType, 'pt-BR')
+    })
+
+    return { kind, rows, truncated }
+  }))
+
+  const pocos = groups.find((group) => group.kind === 'pocos')
+  const sistemas = groups.find((group) => group.kind === 'sistemas')
+  return {
+    pocos: pocos?.rows || [],
+    sistemas: sistemas?.rows || [],
+    truncated: {
+      pocos: Boolean(pocos?.truncated),
+      sistemas: Boolean(sistemas?.truncated)
+    }
+  }
 }

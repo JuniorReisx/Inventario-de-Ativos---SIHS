@@ -1,19 +1,38 @@
+export const EMPTY_NUMBER = 'Sem dado'
+
+function toFiniteNumber (value: unknown): number | null {
+  if (value == null || value === '') return null
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed || /^nan$/i.test(trimmed) || trimmed === '—') return null
+  }
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
 export function formatValue (value: number | string | null | undefined, decimals?: number): string {
-  if (value === null || value === undefined || Number.isNaN(value as number)) {
-    return '—'
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed || /^nan$/i.test(trimmed)) return EMPTY_NUMBER
+    if (!/^-?\d/.test(trimmed)) return value
   }
 
-  if (typeof value === 'number') {
-    if (typeof decimals === 'number') {
-      return new Intl.NumberFormat('pt-BR', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals
-      }).format(value)
-    }
-    return new Intl.NumberFormat('pt-BR').format(value)
-  }
+  const n = toFiniteNumber(value)
+  if (n == null) return EMPTY_NUMBER
 
-  return String(value)
+  if (typeof decimals === 'number') {
+    return new Intl.NumberFormat('pt-BR', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    }).format(n)
+  }
+  return new Intl.NumberFormat('pt-BR').format(n)
+}
+
+export function formatPercent (value: number | string | null | undefined, decimals = 1): string {
+  const n = toFiniteNumber(value)
+  if (n == null) return EMPTY_NUMBER
+  return `${formatValue(n, decimals)}%`
 }
 
 /** Ícones em imagem (arquivo em src/runtime/assets) */

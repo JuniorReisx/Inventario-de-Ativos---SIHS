@@ -249,8 +249,8 @@ export function semiaridoSimWhere (nameField = MUN_FIELDS.name, extraNames?: str
 }
 
 export function formatPopulation (value: number | null): string {
-  if (value == null) return '—'
-  return new Intl.NumberFormat('pt-BR').format(value)
+  if (value == null || !Number.isFinite(Number(value))) return 'Sem dado'
+  return new Intl.NumberFormat('pt-BR').format(Number(value))
 }
 
 export function formatSemiarido (value: string): string {

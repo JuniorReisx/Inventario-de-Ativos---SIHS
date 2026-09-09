@@ -90,8 +90,12 @@ function sumAa(feats){
   return out;
 }
 
+function sidraPossuiLigacao (v) {
+  return Math.max(0, (v.aa_total||0) - (v.aa_sem_rede||0));
+}
+
 function totalDomicilios (v) {
-  return (v.total_domicilios||0) > 0 ? v.total_domicilios : (v.aa_total||0);
+  return sidraPossuiLigacao(v) + (v.aa_sem_rede||0);
 }
 
 function classifyAa(v){

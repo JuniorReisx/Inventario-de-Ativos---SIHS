@@ -30,6 +30,21 @@ function mapFeature (attrs: Record<string, any>, fields: {
   pop: string
 }) {
   const semiaridoRaw = pick(attrs, fields.semi, 'região_do_semiarida', 'regiao_do_semiarida', 'semiarido')
+  const aa_rede = num(pick(attrs, 'aa_l_r_g'))
+  const aa_poco_prof = num(pick(attrs, 'aa_pp_a'))
+  const aa_poco_raso = num(pick(attrs, 'aa_pr_f_c'))
+  const aa_fonte = num(pick(attrs, 'aa_f_n_m'))
+  const aa_pipa = num(pick(attrs, 'aa_cp'))
+  const aa_chuva = num(pick(attrs, 'aa_aca'))
+  const aa_rio = num(pick(attrs, 'aa_racli'))
+  const aa_outra = num(pick(attrs, 'aa_outra'))
+  const aa_sem_rede = num(pick(attrs, 'aa_npl_rg'))
+  const sidraCats = aa_rede + aa_poco_prof + aa_poco_raso + aa_fonte + aa_pipa + aa_chuva + aa_rio + aa_outra + aa_sem_rede
+  const aaTotalField = num(pick(attrs, 'aa_total'))
+  const aa_total = sidraCats > 0 && aaTotalField > sidraCats * 1.2
+    ? sidraCats
+    : (aaTotalField > 0 ? aaTotalField : sidraCats)
+
   return {
     type: 'Feature',
     geometry: null,
@@ -67,16 +82,16 @@ function mapFeature (attrs: Record<string, any>, fields: {
       )),
       pop_urbana: num(pick(attrs, 'st_d_urba_1')),
       pop_rural: num(pick(attrs, 'st_d_rural_1')),
-      aa_total: num(pick(attrs, 'aa_total')),
-      aa_rede: num(pick(attrs, 'aa_l_r_g')),
-      aa_poco_prof: num(pick(attrs, 'aa_pp_a')),
-      aa_poco_raso: num(pick(attrs, 'aa_pr_f_c')),
-      aa_fonte: num(pick(attrs, 'aa_f_n_m')),
-      aa_pipa: num(pick(attrs, 'aa_cp')),
-      aa_chuva: num(pick(attrs, 'aa_aca')),
-      aa_rio: num(pick(attrs, 'aa_racli')),
-      aa_outra: num(pick(attrs, 'aa_outra')),
-      aa_sem_rede: num(pick(attrs, 'aa_npl_rg')),
+      aa_total,
+      aa_rede,
+      aa_poco_prof,
+      aa_poco_raso,
+      aa_fonte,
+      aa_pipa,
+      aa_chuva,
+      aa_rio,
+      aa_outra,
+      aa_sem_rede,
       embasa_agua: text(pick(
         attrs,
         'abastecimento_agua',

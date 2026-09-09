@@ -29,13 +29,13 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
   
   function fmt(n){
     const v = Number(n);
-    if(!Number.isFinite(v)) return '0';
+    if(!Number.isFinite(v)) return 'Sem dado';
     if(Math.abs(v - Math.round(v)) < 1e-9) return Math.round(v).toLocaleString('pt-BR');
     return v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
   }
   function fmt1(n){
     const v = Number(n);
-    if(!Number.isFinite(v)) return '0,00';
+    if(!Number.isFinite(v)) return 'Sem dado';
     return v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
   }
   function sharePct(part, whole){
@@ -43,7 +43,8 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
     return (Number(part)||0) / Number(whole) * 100;
   }
   function fmtShare(pct){
-    return pct==null ? '—' : fmt1(pct) + '%';
+    if(pct==null || !Number.isFinite(Number(pct))) return 'Sem dado';
+    return fmt1(pct) + '%';
   }
   
   /* Escala do mapa: déficit de adequação (0% = tudo adequado → 100% = nada adequado).

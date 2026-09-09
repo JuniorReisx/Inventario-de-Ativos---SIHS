@@ -593,8 +593,11 @@ export function updateCardsFromResults() {}
 export function renderSelectionAttributes() {}
 
 function formatValue(value, decimals) {
-  if (value === null || value === undefined || Number.isNaN(value)) {
-    return "—";
+  if (value === null || value === undefined || Number.isNaN(value) || !Number.isFinite(Number(value))) {
+    if (typeof value === "string" && value.trim() && !/^nan$/i.test(value.trim()) && !/^-?\d/.test(value.trim())) {
+      return value;
+    }
+    return "Sem dado";
   }
 
   if (typeof value === "number") {

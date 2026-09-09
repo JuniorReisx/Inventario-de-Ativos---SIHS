@@ -551,9 +551,9 @@ function resolveMunField (fields: any[], candidates: string[], fallback: string)
 }
 
 function formatMunNumber (value: any): string {
-  if (value == null || value === '') return '—'
+  if (value == null || value === '') return 'Sem dado'
   const num = Number(value)
-  if (!Number.isFinite(num)) return String(value)
+  if (!Number.isFinite(num)) return 'Sem dado'
   return new Intl.NumberFormat('pt-BR').format(num)
 }
 
@@ -583,12 +583,14 @@ function formatMunDate (value: any): string | null {
 }
 
 function formatMunValue (raw: any): string {
-  if (raw == null || raw === '') return '—'
+  if (raw == null || raw === '') return 'Sem dado'
+  if (typeof raw === 'number' && !Number.isFinite(raw)) return 'Sem dado'
   const asDate = formatMunDate(raw)
   if (asDate) return asDate
   if (typeof raw === 'number' && Number.isFinite(raw)) return formatMunNumber(raw)
   const text = String(raw).trim()
-  return text || '—'
+  if (!text || /^nan$/i.test(text)) return 'Sem dado'
+  return text
 }
 
 export function isMunicipioLayer (layer: any): boolean {
