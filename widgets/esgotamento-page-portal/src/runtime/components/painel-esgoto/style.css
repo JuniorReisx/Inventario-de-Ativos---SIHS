@@ -499,21 +499,6 @@
   box-shadow: 0 16px 40px rgba(62, 39, 35, 0.28);
 }
 
-.esgo-painel .ligacao-peer .ligacao-group__label,
-.esgo-painel .ligacao-peer .ligacao-group__share{
-  color: rgba(255, 255, 255, 0.78);
-}
-
-.esgo-painel .ligacao-peer .ligacao-group__value{
-  color: #fff;
-}
-
-.esgo-painel .ligacao-peer .info-tip-btn{
-  border-color: rgba(255, 255, 255, 0.38);
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-}
-
 .esgo-painel .ligacao-group__head{
   padding-right: 28px;
 }
@@ -546,6 +531,18 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--texto-medio);
+}
+
+.esgo-painel .ligacao-peer .ligacao-group__label,
+.esgo-painel .ligacao-peer .ligacao-group__value,
+.esgo-painel .ligacao-peer .ligacao-group__share{
+  color: #fff;
+}
+
+.esgo-painel .ligacao-peer .info-tip-btn{
+  border-color: rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
 }
 
 .esgo-painel .ligacao-group__caption{
