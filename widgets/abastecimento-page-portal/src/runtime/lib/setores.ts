@@ -155,3 +155,104 @@ export async function loadSetoresUrbanoRural (
 
   return { type: 'FeatureCollection', features }
 }
+
+export type SetorCensitarioRow = {
+  codigo: string
+  situacao: string
+  tipo: string
+  nm_mun: string
+  populacao: number
+  domicilios: number
+}
+
+function fieldSet (layer: any): Set<string> {
+  return new Set((layer?.fields || []).map((field: any) => String(field?.name || '')))
+}
+
+function pickAttr (attrs: Record<string, any>, candidates: string[]): string {
+  if (!attrs) return ''
+  const byLower = new Map(Object.keys(attrs).map((key) => [key.toLowerCase(), key]))
+  for (const candidate of candidates) {
+    const actual = byLower.get(candidate.toLowerCase())
+    if (actual == null) continue
+    const value = text(attrs[actual])
+    if (value) return value
+  }
+  return ''
+}
+
+function fieldType (layer: any, fieldName: string): string {
+  const field = (layer?.fields || []).find((item: any) => String(item?.name || '') === fieldName)
+  return String(field?.type || '').toLowerCase()
+}
+
+function munWhere (layer: any, codField: string, codMun: string, nameField: string, nmMun: string): string {
+  const digits = String(codMun || '').replace(/\D/g, '')
+  if (codField && digits) {
+    const asString = fieldType(layer, codField).includes('string')
+    if (asString) return `${codField} = '${digits}'`
+    const n = Number(digits)
+    if (Number.isFinite(n)) return `${codField} = ${Math.round(n)}`
+  }
+  if (nameField && nmMun) {
+    const safe = String(nmMun).replace(/'/g, "''")
+    return `UPPER(${nameField}) = UPPER('${safe}')`
+  }
+  return '1=0'
+}
+
+/**
+ * Lista os setores censitários individuais do município (não o agregado urbano/rural).
+ */
+export async function querySetoresDoMunicipio (
+  layer: any,
+  options: { codMun: string, nmMun?: string }
+): Promise<SetorCensitarioRow[]> {
+  if (!layer || typeof layer.queryFeatures !== 'function') return []
+  await layer.load?.()
+
+  const sitField = resolveField(layer, 'situacao', 'Situação do Setor Censitário', 'nm_sit')
+  const codField = resolveField(layer, 'cd_mun', 'codigo do municipio')
+  const nameField = resolveField(layer, 'nm_mun', 'municipio')
+  const setorField = resolveField(layer, 'cd_setor', 'codigo do setor')
+  const tipoField = resolveField(layer, 'nm_tipo', 'tipo_sc', 'tipo_setor', 'tipo')
+  const available = fieldSet(layer)
+  const wanted = [sitField, codField, nameField, setorField, tipoField, 'v0001', 'v0002']
+    .filter((name) => name && (available.size === 0 || available.has(name)))
+
+  const where = munWhere(layer, codField, options.codMun, nameField, options.nmMun || '')
+  const rows: SetorCensitarioRow[] = []
+  let offset = 0
+  const pageSize = 1000
+
+  while (true) {
+    const query = layer.createQuery()
+    query.where = where
+    query.returnGeometry = false
+    query.outFields = wanted.length ? wanted : ['*']
+    query.num = pageSize
+    query.start = offset
+    if (setorField) query.orderByFields = [`${setorField} ASC`]
+    const result = await layer.queryFeatures(query)
+    const page = result?.features || []
+    for (const feature of page) {
+      const attrs = feature.attributes || {}
+      const situacao = classifySituacao(sitField ? attrs[sitField] : pickAttr(attrs, ['situacao', 'nm_sit']))
+        || pickAttr(attrs, ['situacao', 'nm_sit'])
+        || '—'
+      rows.push({
+        codigo: (setorField ? text(attrs[setorField]) : '') || pickAttr(attrs, ['cd_setor', 'codigo_do_setor']) || '—',
+        situacao,
+        tipo: (tipoField ? text(attrs[tipoField]) : '') || pickAttr(attrs, ['nm_tipo', 'tipo_sc', 'tipo_setor']) || '',
+        nm_mun: (nameField ? text(attrs[nameField]) : '') || options.nmMun || '',
+        populacao: num(attrs.v0001),
+        domicilios: num(attrs.v0002)
+      })
+    }
+    if (page.length < pageSize) break
+    offset += page.length
+    if (offset > 8000) break
+  }
+
+  return rows
+}

@@ -2,7 +2,7 @@ import { React } from 'jimu-core'
 import { initPainelEsgoto } from '../../lib/painel'
 import { prepareEsgotamentoMap, resizeMapView } from '../../lib/map'
 import { loadMunicipiosFromLayer, applySemiaridoFromKeys } from '../../lib/geo'
-import { loadSetoresUrbanoRural } from '../../lib/setores'
+import { loadSetoresUrbanoRural, querySetoresDoMunicipio } from '../../lib/setores'
 import PortalLoader from '../portal-loader'
 import './style.css'
 
@@ -92,10 +92,15 @@ const PainelEsgoto = ({ folderUrl }: { folderUrl: string }) => {
           features: any[]
           __loaded: boolean
           __refresh?: () => void
+          __queryMun?: (codMun: string, nmMun?: string) => Promise<any[]>
         } = {
           type: 'FeatureCollection',
           features: [],
           __loaded: false
+        }
+        if (prepared.setoresLayer) {
+          setoresHolder.__queryMun = (codMun, nmMun) =>
+            querySetoresDoMunicipio(prepared.setoresLayer, { codMun, nmMun })
         }
         destroyPainel = initPainelEsgoto(
           root,
@@ -171,12 +176,12 @@ const PainelEsgoto = ({ folderUrl }: { folderUrl: string }) => {
         <main>
           <div className="var-banner" role="note">
             <span className="var-banner-label">Variável</span>
-            Domicílios particulares permanentes ocupados <span className="var-banner-unit">(Unidades)</span>
+            Domicílios particulares permanentes ocupados <span className="var-banner-unit">(SIDRA 6805 · unidades)</span>
             <button type="button" id="btnExportPdf" className="btn-export-pdf">Exportar PDF</button>
           </div>
 
           <div className="view active" id="view-esgoto">
-            <div className="kpis kpis-bento" id="kpiRow-esgoto"></div>
+            <div className="ligacao-board" id="kpiRow-esgoto"></div>
 
             <div className="stage-row">
               <aside className="stage-filters">
@@ -220,7 +225,7 @@ const PainelEsgoto = ({ folderUrl }: { folderUrl: string }) => {
                       <p className="aglomerados-hint" id="aglomeradosHint">Disponível após selecionar um município</p>
                       <div className="popup-panel" id="aglomeradosModal" hidden role="dialog" aria-labelledby="aglomeradosTitle">
                         <div className="popup-header">
-                          <h2 id="aglomeradosTitle">Aglomerados do município</h2>
+                          <h2 id="aglomeradosTitle">Setores censitários do município</h2>
                           <button type="button" className="popup-close" id="aglomeradosClose" aria-label="Fechar">×</button>
                         </div>
                         <div className="popup-body">
@@ -228,28 +233,31 @@ const PainelEsgoto = ({ folderUrl }: { folderUrl: string }) => {
                             <table className="data-table" id="aglomeradosTable">
                               <thead>
                                 <tr>
-                                  <th>Nome do aglomerado</th>
-                                  <th>Tipo de aglomerado</th>
-                                  <th>Município</th>
+                                  <th>Código do setor</th>
+                                  <th>Situação</th>
                                   <th>População</th>
+                                  <th>Domicílios</th>
                                 </tr>
                               </thead>
                               <tbody id="aglomeradosTbody"></tbody>
                             </table>
                           </div>
-                          <p className="empty-msg" id="aglomeradosEmpty" style={{ display: 'none' }}>Nenhum aglomerado encontrado para este município.</p>
+                          <p className="empty-msg" id="aglomeradosEmpty" style={{ display: 'none' }}>Nenhum setor censitário encontrado para este município.</p>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="panel muni-detail-panel" id="muniDetailPanel" style={{ display: 'none' }}>
-                  <div className="panel-header">
-                    <span className="muni-detail-title">Município — <span id="muniDetailName"></span></span>
-                    <button type="button" id="muniDetailClose" className="btn-clear-muni visible" title="Desselecionar município">Fechar</button>
+                <div className="panel muni-detail-panel recorte-panel" id="muniDetailPanel">
+                  <div className="panel-header recorte-panel__head">
+                    <div className="recorte-panel__titles">
+                      <span className="recorte-panel__kicker">Recorte atual</span>
+                      <span className="muni-detail-title" id="muniDetailTitle">Estado da Bahia</span>
+                    </div>
+                    <button type="button" id="muniDetailClose" className="btn-clear-muni" title="Desselecionar município" hidden>Fechar</button>
                   </div>
-                  <div className="panel-body" id="muniDetailBody"></div>
+                  <div className="panel-body recorte-panel__body" id="muniDetailBody"></div>
                 </div>
               </aside>
 

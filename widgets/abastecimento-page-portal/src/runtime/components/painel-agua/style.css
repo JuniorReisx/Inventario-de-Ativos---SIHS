@@ -527,14 +527,49 @@
 }
 
 .abas-painel .ligacao-group{
-  background: linear-gradient(180deg, #f4fbfe 0%, #ffffff 42%);
-  border-color: #d5eef6;
+  border: 0;
+  background: linear-gradient(90deg, #041018 0%, #071C33 32%, #1B5FA0 72%, #2fb6dd 100%);
+  box-shadow: 0 16px 40px rgba(7, 28, 51, 0.28);
+}
+
+.abas-painel .ligacao-group .ligacao-group__label,
+.abas-painel .ligacao-group .ligacao-group__share,
+.abas-painel .ligacao-group .ligacao-group__caption{
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.abas-painel .ligacao-group .ligacao-group__value{
+  color: #fff;
+}
+
+.abas-painel .ligacao-group .info-tip-btn{
+  border-color: rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
 }
 
 .abas-painel .ligacao-peer{
   display: flex;
   flex-direction: column;
   justify-content: center;
+  border: 0;
+  background: linear-gradient(90deg, #041018 0%, #071C33 32%, #1B5FA0 72%, #2fb6dd 100%);
+  box-shadow: 0 16px 40px rgba(7, 28, 51, 0.28);
+}
+
+.abas-painel .ligacao-peer .ligacao-group__label,
+.abas-painel .ligacao-peer .ligacao-group__share{
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.abas-painel .ligacao-peer .ligacao-group__value{
+  color: #fff;
+}
+
+.abas-painel .ligacao-peer .info-tip-btn{
+  border-color: rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
 }
 
 .abas-painel .ligacao-group__head{
@@ -580,19 +615,29 @@
 
 .abas-painel .ligacao-split{
   display: flex;
-  height: 8px;
+  height: 16px;
+  gap: 3px;
+  padding: 3px;
+  box-sizing: border-box;
   border-radius: 999px;
   overflow: hidden;
-  background: #e8f1f5;
+  background: #fff;
   margin-bottom: 12px;
+  box-shadow: 0 2px 12px rgba(4, 16, 24, 0.28);
+}
+
+.abas-painel .ligacao-split span{
+  display: block;
+  border-radius: 999px;
+  min-width: 8px;
 }
 
 .abas-painel .ligacao-split span:first-child{
-  background: #0f5876;
+  background: #041018;
 }
 
 .abas-painel .ligacao-split span:last-child{
-  background: #7eb7d0;
+  background: #1B5FA0;
 }
 
 .abas-painel .ligacao-group__parts{
@@ -603,50 +648,67 @@
 
 .abas-painel .ligacao-part{
   position: relative;
-  background: #fff;
-  border: 1px solid #e4eaee;
+  border: 0;
   border-radius: 12px;
-  padding: 12px 14px 12px;
+  padding: 12px 14px 12px 16px;
   min-width: 0;
+  box-shadow: 0 8px 20px rgba(4, 16, 24, 0.22);
 }
 
-.abas-painel .ligacao-part.is-alt{
-  background: #f7fafc;
+.abas-painel .ligacao-part::before{
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 4px;
+  border-radius: 999px;
+  background: #fff;
 }
 
-.abas-painel .ligacao-part__name{
+.abas-painel .ligacao-part--rede{
+  background: linear-gradient(90deg, #041018 0%, #071C33 42%, #1B5FA0 100%);
+}
+
+.abas-painel .ligacao-part--outra{
+  background: linear-gradient(90deg, #0b3a62 0%, #1B5FA0 48%, #2fb6dd 100%);
+}
+
+.abas-painel .ligacao-part__name,
+.abas-painel .ligacao-part__share{
   margin: 0 22px 8px 0;
   font-size: 13px;
   font-weight: 600;
   line-height: 1.35;
-  color: var(--texto-escuro);
-}
-
-.abas-painel .ligacao-part__value{
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--primary);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .abas-painel .ligacao-part__share{
   margin: 3px 0 0;
   font-size: 12px;
-  font-weight: 600;
-  color: var(--texto-claro);
+}
+
+.abas-painel .ligacao-part__value,
+.abas-painel .ligacao-part--rede .ligacao-part__value,
+.abas-painel .ligacao-part--outra .ligacao-part__value{
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.abas-painel .ligacao-part .info-tip-btn{
+  border-color: rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
 }
 
 .abas-painel .ligacao-group > .info-tip,
 .abas-painel .ligacao-peer > .info-tip,
-.abas-painel .ligacao-part > .info-tip{
-  position: absolute;
-  top: 12px;
-  right: 12px;
-}
-
+.abas-painel .ligacao-part > .info-tip,
 .abas-painel .ligacao-group__head > .info-tip{
   position: absolute;
   top: 12px;
@@ -664,6 +726,7 @@
     grid-template-columns: 1fr;
   }
 }
+
 
 .abas-painel .kpis-compare{
   display: grid;
@@ -2338,3 +2401,102 @@
 .abas-painel .var-banner{ font-size: 14.5px; }
 .abas-painel .regiao-select,
 .abas-painel .search-box input{ font-size: 14.5px; }
+
+.abas-painel .setor-popup[hidden],
+.abas-painel .setor-popup:not(.is-open){
+  display: none !important;
+}
+
+.abas-painel .setor-popup.is-open{
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  z-index: 30;
+  width: min(320px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+}
+
+.abas-painel .setor-popup__card{
+  position: relative;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--linha);
+  border-radius: 12px;
+  box-shadow: var(--sombra-card);
+  padding: 14px 14px 16px;
+}
+
+.abas-painel .setor-popup__close{
+  appearance: none;
+  border: 0;
+  background: rgba(7, 28, 51, 0.08);
+  color: var(--primary);
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.abas-painel .setor-popup__kicker{
+  margin: 0 28px 4px 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--azul-medio);
+}
+
+.abas-painel .setor-popup__eyebrow{
+  margin: 0 28px 2px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--texto-medio);
+}
+
+.abas-painel .setor-popup__title{
+  margin: 0 28px 12px 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--primary);
+  overflow-wrap: anywhere;
+}
+
+.abas-painel .setor-popup__grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin: 0;
+}
+
+.abas-painel .setor-popup__row{
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  min-width: 0;
+}
+
+.abas-painel .setor-popup__label{
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--texto-claro);
+}
+
+.abas-painel .setor-popup__value{
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--texto-escuro);
+  overflow-wrap: anywhere;
+}

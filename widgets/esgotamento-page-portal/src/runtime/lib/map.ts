@@ -199,6 +199,87 @@ function applyOutlineOnlyPolygons (layer: any): void {
   } catch (_) {}
 }
 
+function keepSetoresOriginalSymbology (layer: any): void {
+  if (!layer) return
+  try { layer.labelsVisible = false } catch (_) {}
+  try { layer.labelingInfo = [] } catch (_) {}
+}
+
+function pickAttrValue (attrs: Record<string, any> | null | undefined, candidates: string[]): any {
+  if (!attrs) return null
+  const byLower = new Map(Object.keys(attrs).map((key) => [key.toLowerCase(), key]))
+  for (const candidate of candidates) {
+    const actual = byLower.get(candidate.toLowerCase())
+    if (actual == null) continue
+    const value = attrs[actual]
+    if (value != null && String(value).trim() !== '') return value
+  }
+  return null
+}
+
+function formatSetorValue (layer: any, fieldHint: string, raw: any): string {
+  if (raw == null || raw === '') return '—'
+  try {
+    const field = (layer?.fields || []).find((item: any) => normalizeText(item?.name || '') === normalizeText(fieldHint))
+    const coded = field?.domain?.codedValues as Array<{ code: any, name: string }> | undefined
+    const match = coded?.find((item) => String(item.code) === String(raw))
+    if (match?.name) return match.name
+  } catch (_) {}
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: Number.isInteger(raw) ? 0 : 2 }).format(raw)
+  }
+  const text = String(raw).trim()
+  return text || '—'
+}
+
+type SetorPopupSpec = { label: string, candidates: string[] }
+
+function setorPopupSpecs (theme: 'agua' | 'esgoto'): SetorPopupSpec[] {
+  const common: SetorPopupSpec[] = [
+    { label: 'Município', candidates: ['nm_mun', 'municipio', 'nome_do_municipio'] },
+    { label: 'Situação', candidates: ['situacao', 'nm_sit', 'sit_setor', 'situacao_do_setor_censitario'] },
+    { label: 'Tipo de setor', candidates: ['nm_tipo', 'tipo_sc', 'tipo_setor', 'tipo'] },
+    { label: 'Distrito', candidates: ['nm_dist', 'nm_distrito', 'distrito'] },
+    { label: 'Aglomerado', candidates: ['nm_aglom', 'nome_aglomerado', 'aglomerado'] },
+    { label: 'População', candidates: ['v0001', 'populacao', 'pop'] },
+    { label: 'Domicílios', candidates: ['v0002', 'domicilios', 'total_domicilios'] }
+  ]
+  if (theme === 'esgoto') {
+    return [
+      ...common,
+      { label: 'Domicílios com banheiro', candidates: ['v00232'] },
+      { label: 'Rede geral de esgoto', candidates: ['v00309'] }
+    ]
+  }
+  return [
+    ...common,
+    { label: 'Rede geral de distribuição', candidates: ['v00111'] },
+    { label: 'Poço profundo ou artesiano', candidates: ['v00112'] },
+    { label: 'Poço raso, freático ou cacimba', candidates: ['v00113'] },
+    { label: 'Fonte, nascente ou mina', candidates: ['v00114'] },
+    { label: 'Carro-pipa', candidates: ['v00115'] },
+    { label: 'Água de chuva armazenada', candidates: ['v00116'] },
+    { label: 'Rios, açudes, córregos e lagos', candidates: ['v00117'] }
+  ]
+}
+
+function setoresMunWhere (layer: any, codMun: string, nmMun?: string): string {
+  const codField = resolveField(layer, 'cd_mun', 'codigo do municipio')
+  const nameField = resolveField(layer, 'nm_mun', 'municipio')
+  const digits = String(codMun || '').replace(/\D/g, '')
+  const field = (layer?.fields || []).find((item: any) => String(item?.name || '') === codField)
+  const asString = String(field?.type || '').toLowerCase().includes('string')
+  if (codField && digits) {
+    if (asString) return `${sqlField(codField)} = '${digits}'`
+    const n = Number(digits)
+    if (Number.isFinite(n)) return `${sqlField(codField)} = ${Math.round(n)}`
+  }
+  if (nameField && nmMun) {
+    return `UPPER(${sqlField(nameField)}) = UPPER('${escapeSql(nmMun)}')`
+  }
+  return '1=0'
+}
+
 function semiOutlineSymbol () {
   return outlineFillSymbol(SEMI_OUTLINE, 2.6)
 }
@@ -629,6 +710,31 @@ function graphicFromHit (hit: any, layer: any): any | null {
   return match?.graphic || null
 }
 
+async function resolveSetorGraphic (view: any, layer: any, event: any): Promise<any | null> {
+  if (!view || !layer) return null
+  try {
+    const hit = await view.hitTest(event, { include: [layer] })
+    const graphic = graphicFromHit(hit, layer)
+    if (graphic?.attributes) return graphic
+  } catch (_) {}
+  const mapPoint = event?.mapPoint || (typeof view?.toMap === 'function'
+    ? view.toMap({ x: event?.x, y: event?.y })
+    : null)
+  if (!mapPoint || typeof layer.queryFeatures !== 'function') return null
+  try {
+    const query = typeof layer.createQuery === 'function' ? layer.createQuery() : {}
+    query.geometry = mapPoint
+    query.spatialRelationship = 'intersects'
+    query.returnGeometry = false
+    query.outFields = ['*']
+    query.num = 1
+    const result = await layer.queryFeatures(query)
+    return result?.features?.[0] || null
+  } catch (_) {
+    return null
+  }
+}
+
 async function queryMunicipioAtPoint (layer: any, mapPoint: any): Promise<any | null> {
   if (!layer || !mapPoint || typeof layer.queryFeatures !== 'function') return null
   try { await layer.load?.() } catch (_) {}
@@ -706,6 +812,8 @@ export type PainelMapApi = {
   capture: (state?: PainelMapState) => Promise<string | null>
   captureLegend: () => Promise<import('./relatorio-pdf').RelatorioLegendGroup[]>
   setMunicipios: (items: Array<{ cod_mun?: string, nm_mun?: string }>) => void
+  showSetores: (codMun: string, nmMun?: string) => Promise<void>
+  hideSetores: () => void
   onSelect: (handler: (codMun: string) => void) => () => void
   onHover: (handler: (name: string | null, clientX: number, clientY: number) => void) => () => void
 }
@@ -718,6 +826,8 @@ export function createMapApi (view: any, layer: any, options: {
   semiGeometries?: any[]
   semiMunWhere?: string
   selectionColors?: { fill: number[], outline: number[] }
+  setoresLayer?: any | null
+  setoresTheme?: 'agua' | 'esgoto'
 } = {}): PainelMapApi {
   const nameField = resolveField(layer, 'nome_do_municipio', 'nm_mun', 'municipio', 'nome')
   const tiField = resolveField(layer, 'territorio_de_indentidade', 'territorio_de_identidade', 'territorio')
@@ -823,6 +933,78 @@ export function createMapApi (view: any, layer: any, options: {
   }
   let selectionToken = 0
   let highlightHandle: { remove?: () => void } | null = null
+  let setoresActive = false
+  let setorPopupEl: HTMLElement | null = null
+
+  const closeSetorPopup = () => {
+    if (!setorPopupEl) return
+    setorPopupEl.classList.remove('is-open')
+    setorPopupEl.hidden = true
+    setorPopupEl.innerHTML = ''
+  }
+
+  const ensureSetorPopup = () => {
+    const host = view?.container?.parentElement || view?.container
+    if (!host) return null
+    if (!setorPopupEl || !host.contains(setorPopupEl)) {
+      setorPopupEl = document.createElement('div')
+      setorPopupEl.className = 'setor-popup'
+      setorPopupEl.hidden = true
+      setorPopupEl.setAttribute('role', 'complementary')
+      setorPopupEl.setAttribute('aria-label', 'Ficha do setor censitário')
+      host.appendChild(setorPopupEl)
+    }
+    return setorPopupEl
+  }
+
+  const openSetorPopup = (graphic: any) => {
+    const el = ensureSetorPopup()
+    const sl = options.setoresLayer
+    if (!el) return
+    const attrs = graphic?.attributes || {}
+    const code = pickAttrValue(attrs, ['cd_setor', 'codigo_do_setor'])
+    const munName = pickAttrValue(attrs, ['nm_mun', 'municipio', 'nome_do_municipio'])
+    const theme = options.setoresTheme || 'esgoto'
+    const rows = setorPopupSpecs(theme).flatMap((spec) => {
+      const raw = pickAttrValue(attrs, spec.candidates)
+      if (raw == null) return []
+      return [{ label: spec.label, value: formatSetorValue(sl, spec.candidates[0], raw) }]
+    })
+    const title = code != null && String(code).trim() ? String(code) : 'Setor censitário'
+    const eyebrow = munName != null ? `<p class="setor-popup__eyebrow">${String(munName)}</p>` : ''
+    el.innerHTML = `
+      <div class="setor-popup__card">
+        <button type="button" class="setor-popup__close" aria-label="Fechar">×</button>
+        <p class="setor-popup__kicker">Ficha do setor censitário</p>
+        ${eyebrow}
+        <h4 class="setor-popup__title">${title}</h4>
+        <dl class="setor-popup__grid">
+          ${rows.map((row) => `
+            <div class="setor-popup__row">
+              <dt class="setor-popup__label">${row.label}</dt>
+              <dd class="setor-popup__value">${row.value}</dd>
+            </div>
+          `).join('')}
+        </dl>
+      </div>
+    `
+    el.hidden = false
+    el.classList.add('is-open')
+    el.querySelector('.setor-popup__close')?.addEventListener('click', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      closeSetorPopup()
+    })
+  }
+
+  const hideSetoresLayer = () => {
+    setoresActive = false
+    closeSetorPopup()
+    const sl = options.setoresLayer
+    if (!sl) return
+    try { sl.definitionExpression = null } catch (_) {}
+    setLayerVisible(sl, false)
+  }
 
   const clearLayerViewHighlight = () => {
     try { highlightHandle?.remove?.() } catch (_) {}
@@ -897,6 +1079,9 @@ export function createMapApi (view: any, layer: any, options: {
     sync (state: PainelMapState) {
       syncOverlayLayers(state)
       void applyMunicipioHighlight(state.selectedMun || null)
+      if (!state.selectedMun) {
+        hideSetoresLayer()
+      }
     },
 
     setMunicipios (items) {
@@ -906,6 +1091,27 @@ export function createMapApi (view: any, layer: any, options: {
         const name = String(item?.nm_mun || '').trim()
         if (cod && name) munByName.set(normalizeMunName(name), cod)
       }
+    },
+
+    async showSetores (codMun: string, nmMun?: string) {
+      const sl = options.setoresLayer
+      if (!sl) return
+      try { await sl.load?.() } catch (_) {}
+      keepSetoresOriginalSymbology(sl)
+      sl.definitionExpression = setoresMunWhere(sl, codMun, nmMun)
+      try { if ('outFields' in sl) sl.outFields = ['*'] } catch (_) {}
+      if (typeof sl.popupEnabled === 'boolean') sl.popupEnabled = false
+      sl.listMode = 'hide'
+      setLayerVisible(sl, true)
+      bringLayerToFront(options.webMap, sl)
+      if (options.selectionHighlightLayer) {
+        bringLayerToFront(options.webMap, options.selectionHighlightLayer)
+      }
+      setoresActive = true
+    },
+
+    hideSetores () {
+      hideSetoresLayer()
     },
 
     async zoomToMun (codMun: string) {
@@ -970,6 +1176,11 @@ export function createMapApi (view: any, layer: any, options: {
     onSelect (handler) {
       const clickHandle = view.on('click', async (event: any) => {
         try {
+          if (setoresActive && options.setoresLayer) {
+            const setor = await resolveSetorGraphic(view, options.setoresLayer, event)
+            if (setor) openSetorPopup(setor)
+            return
+          }
           const graphic = await resolveMunicipioGraphic(view, layer, event)
           const cod = resolveCod(graphic?.attributes)
           if (cod) handler(cod)
@@ -1102,6 +1313,7 @@ export async function prepareEsgotamentoMap (container: HTMLElement): Promise<{
     || findLayerByTitle(webMap, 'Setores Censitarios')
   if (setoresLayer) {
     if (typeof setoresLayer.popupEnabled === 'boolean') setoresLayer.popupEnabled = false
+    keepSetoresOriginalSymbology(setoresLayer)
     setoresLayer.listMode = 'hide'
     setLayerVisible(setoresLayer, false)
   }
@@ -1121,6 +1333,8 @@ export async function prepareEsgotamentoMap (container: HTMLElement): Promise<{
       selectionHighlightLayer,
       semiGeometries,
       semiMunWhere,
+      setoresLayer,
+      setoresTheme: 'esgoto',
       selectionColors: {
         fill: [139, 90, 43, 0.45],
         outline: [255, 196, 0, 1]

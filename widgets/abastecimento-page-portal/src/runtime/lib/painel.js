@@ -451,6 +451,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
   }
   
   function showMapHint(clientX, clientY, text){
+    if(state.selectedMun){ hideMapHint(); return; }
     const wrap = qs('#'+'mapWrap-'+state.tab);
     if(!wrap || !text) return;
     const hint = wrap.querySelector('.map-hint');
@@ -473,6 +474,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
   }
   
   function handleMapPointerHint(e){
+    if(state.selectedMun){ hideMapHint(); return; }
     const hit = document.elementFromPoint(e.clientX, e.clientY);
     const text = hintTextFromTarget(hit);
     if(!text){ hideMapHint(); return; }
@@ -912,13 +914,13 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
           <span style="width:${Math.max(2, pctOutraLig)}%"></span>
         </div>
         <div class="ligacao-group__parts">
-          <div class="ligacao-part">
+          <div class="ligacao-part ligacao-part--rede">
             ${infoTip('Domicílios cuja forma principal de abastecimento é a rede geral de distribuição (SIDRA / Censo 2022).')}
             <p class="ligacao-part__name">Usa a rede como forma principal</p>
             <p class="ligacao-part__value">${fmt(v.aa_rede)}</p>
             <p class="ligacao-part__share">${fmt1(pctUsaLig)}% de quem tem ligação</p>
           </div>
-          <div class="ligacao-part is-alt">
+          <div class="ligacao-part ligacao-part--outra">
             ${infoTip('Domicílios com ligação à rede geral que declaram outra forma como principal: quem possui ligação menos quem usa a rede como forma principal.')}
             <p class="ligacao-part__name">Tem ligação, mas usa outra forma</p>
             <p class="ligacao-part__value">${fmt(outraForma)}</p>
@@ -1048,23 +1050,32 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     if(!hasSelection) closeAglomeradosModal();
   }
   
-  function tipoAglomerado(nome){
-    const s = String(nome||'').toLowerCase();
-    if(/quilombola/.test(s)) return 'Comunidade quilombola';
-    if(/aldeia|indígena|indigena/.test(s)) return 'Aldeia indígena';
-    return 'Aglomerado rural';
+  let setoresModalSeq = 0;
+
+  function fillSetoresModalRows(rows, nm){
+    const tbody = qs('#'+'aglomeradosTbody');
+    const empty = qs('#'+'aglomeradosEmpty');
+    const table = qs('#'+'aglomeradosTable');
+    const title = qs('#'+'aglomeradosTitle');
+    const qtd = rows.length;
+    if(title) title.textContent = `Setores censitários — ${nm} · ${fmt(qtd)} ${qtd === 1 ? 'setor' : 'setores'}`;
+    if(tbody) tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td>${r.codigo || '—'}</td>
+        <td>${r.situacao || '—'}</td>
+        <td class="num">${fmt(r.populacao)}</td>
+        <td class="num">${fmt(r.domicilios)}</td>
+      </tr>
+    `).join('');
+    const has = qtd > 0;
+    if(table) table.style.display = has ? '' : 'none';
+    if(empty){
+      empty.style.display = has ? 'none' : '';
+      empty.textContent = 'Nenhum setor censitário encontrado para este município.';
+    }
   }
-  
-  function aglomeradosDoMunicipio(codMun){
-    const pts = PTS_DATA || [];
-    const cod = String(codMun||'');
-    return pts
-      .filter(p => String(p.m) === cod)
-      .slice()
-      .sort((a,b)=> String(a.n||'').localeCompare(String(b.n||''), 'pt-BR'));
-  }
-  
-  function openAglomeradosModal(){
+
+  async function openAglomeradosModal(){
     if(!state.selectedMun) return;
     const modal = qs('#'+'aglomeradosModal');
     const btn = qs('#'+'btnAglomerados');
@@ -1072,36 +1083,49 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
       closeAglomeradosModal();
       return;
     }
-  
-    const f = GEO.features.find(f=>f.properties.cod_mun===state.selectedMun);
+
+    const f = GEO.features.find(x=>x.properties.cod_mun===state.selectedMun);
     const nm = f ? f.properties.nm_mun : state.selectedMun;
-    const rows = aglomeradosDoMunicipio(state.selectedMun);
-    const title = qs('#'+'aglomeradosTitle');
     const tbody = qs('#'+'aglomeradosTbody');
     const empty = qs('#'+'aglomeradosEmpty');
     const table = qs('#'+'aglomeradosTable');
-  
-    const qtd = rows.length;
-    title.textContent = `Aglomerados — ${nm} · ${qtd} ${qtd === 1 ? 'aglomerado' : 'aglomerados'}`;
-    tbody.innerHTML = rows.map(p => `
-      <tr>
-        <td>${p.n || '—'}</td>
-        <td>${tipoAglomerado(p.n)}</td>
-        <td>${p.mn || nm}</td>
-        <td class="num">${fmt(p.h)}</td>
-      </tr>
-    `).join('');
-  
-    const has = qtd > 0;
-    table.style.display = has ? '' : 'none';
-    empty.style.display = has ? 'none' : '';
-    empty.textContent = 'Nenhum aglomerado encontrado para este município.';
+    const title = qs('#'+'aglomeradosTitle');
+    if(title) title.textContent = `Setores censitários — ${nm}`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="4">Carregando setores censitários…</td></tr>`;
+    if(table) table.style.display = '';
+    if(empty) empty.style.display = 'none';
     modal.hidden = false;
     if(btn) btn.setAttribute('aria-expanded', 'true');
     requestAnimationFrame(()=> modal.classList.add('is-open'));
+    if(useWebMap && typeof mapApi.showSetores === 'function'){
+      void mapApi.showSetores(state.selectedMun, nm);
+    }
+
+    const seq = ++setoresModalSeq;
+    const queryMun = SETORES && typeof SETORES.__queryMun === 'function' ? SETORES.__queryMun : null;
+    try {
+      const rows = queryMun
+        ? await queryMun(state.selectedMun, nm)
+        : [];
+      if(seq !== setoresModalSeq || !state.selectedMun) return;
+      fillSetoresModalRows(rows || [], nm);
+    } catch (error) {
+      console.warn('[painel] setores do município:', error);
+      if(seq !== setoresModalSeq) return;
+      if(tbody) tbody.innerHTML = '';
+      if(table) table.style.display = 'none';
+      if(empty){
+        empty.style.display = '';
+        empty.textContent = 'Não foi possível carregar os setores censitários deste município.';
+      }
+    }
   }
   
   function closeAglomeradosModal(){
+    setoresModalSeq++;
+    if(useWebMap && typeof mapApi.hideSetores === 'function'){
+      mapApi.hideSetores();
+    }
     const modal = qs('#'+'aglomeradosModal');
     const btn = qs('#'+'btnAglomerados');
     if(btn) btn.setAttribute('aria-expanded', 'false');
@@ -1125,6 +1149,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
   
   function selectMunicipio(codMun){
     state.selectedMun = codMun;
+    hideMapHint();
     const f = GEO.features.find(f=>f.properties.cod_mun===codMun);
     qs('#'+'muniSearch-agua').value = f?f.properties.nm_mun:'';
     updateMuniSelectionUI();
@@ -1289,7 +1314,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     }
     unbindMap.push(mapApi.onSelect(toggleMunicipio));
     unbindMap.push(mapApi.onHover((name, x, y)=>{
-      if(!name){ hideMapHint(); return; }
+      if(state.selectedMun || !name){ hideMapHint(); return; }
       showMapHint(x, y, name);
     }));
   }

@@ -95,8 +95,15 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
     return out;
   }
 
+  function sidraOcupados (v) {
+    const lig = ligacaoEsg(v);
+    const rest = (v.esg_fossa_sep||0) + (v.esg_fossa_rud||0) + (v.esg_vala||0) + (v.esg_rio||0) + (v.esg_outra||0) + (v.esg_sem||0);
+    const cats = lig.highlight + rest;
+    return cats > 0 ? cats : (v.esg_total||0);
+  }
+
   function totalDomicilios (v) {
-    return (v.total_domicilios||0) > 0 ? v.total_domicilios : (v.esg_total||0);
+    return sidraOcupados(v);
   }
 
   function ligacaoEsg (v) {
@@ -153,6 +160,27 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
     if(state.regiao!=='todas') feats = feats.filter(f=>f.properties.territorio===state.regiao);
     return feats;
   }
+  function currentScopeTitle(){
+    if(state.selectedMun){
+      const f = GEO.features.find(x=>x.properties.cod_mun===state.selectedMun);
+      return f?f.properties.nm_mun:state.selectedMun;
+    }
+    if(state.semiOn && state.regiao==='todas'){
+      return 'Região Semiárida';
+    }
+    if(state.regiao!=='todas'){
+      return state.regiao;
+    }
+    return 'Estado da Bahia';
+  }
+
+  function currentScopeKicker(){
+    if(state.selectedMun) return 'Município';
+    if(state.semiOn && state.regiao==='todas') return 'Recorte atual';
+    if(state.regiao!=='todas') return state.semiOn ? 'Território · Semiárido' : 'Território de Identidade';
+    return 'Recorte atual';
+  }
+
   function currentSelectionLabel(){
     if(state.selectedMun){
       const f = GEO.features.find(f=>f.properties.cod_mun===state.selectedMun);
@@ -404,6 +432,7 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
   }
   
   function showMapHint(clientX, clientY, text){
+    if(state.selectedMun){ hideMapHint(); return; }
     const wrap = qs('#'+'mapWrap-'+state.tab);
     if(!wrap || !text) return;
     const hint = wrap.querySelector('.map-hint');
@@ -426,6 +455,7 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
   }
   
   function handleMapPointerHint(e){
+    if(state.selectedMun){ hideMapHint(); return; }
     const hit = document.elementFromPoint(e.clientX, e.clientY);
     const text = hintTextFromTarget(hit);
     if(!text){ hideMapHint(); return; }
@@ -849,13 +879,12 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
     const feats = currentSelectionFeatures();
     const v = sumEsg(feats);
     const cl = classifyEsg(v);
-    const pop = feats.reduce((s,f)=>s+(f.properties.populacao||0),0);
     const lig = ligacaoEsg(v);
     const tot = totalDomicilios(v);
     const pctHighlight = tot ? lig.highlight/tot*100 : 0;
     const pctSem = tot ? (v.esg_sem||0)/tot*100 : 0;
-    const pctPluvial = tot ? lig.pluvial/tot*100 : 0;
-    const pctFossaLig = tot ? lig.fossaLigada/tot*100 : 0;
+    const pctPluvialLig = lig.highlight ? lig.pluvial/lig.highlight*100 : 0;
+    const pctFossaLig = lig.highlight ? lig.fossaLigada/lig.highlight*100 : 0;
     const formaCats = lig.pluvial + lig.fossaLigada > 0 ? ESG_COMP_CATS : ESG_LEGACY_CATS;
   
     const bahiaV = sumEsg(GEO.features);
@@ -864,24 +893,39 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
   
     const kpiRow = qs('#'+'kpiRow-esgoto');
     if (kpiRow) kpiRow.innerHTML = `
-      <div class="kpi">${infoTip('Quantidade de municípios incluídos no filtro ou município atualmente selecionado.')}
-        <div class="val">${fmt(feats.length)}</div><div class="lbl">Municípios na seleção</div></div>
-      <div class="kpi">${infoTip('População estimada IBGE 2026 somada dos municípios da seleção.')}
-        <div class="val">${fmt(pop)}</div><div class="lbl">População (estimativa 2026)</div></div>
-      <div class="kpi">${infoTip('Total de domicílios particulares permanentes recenseados no recorte (Censo IBGE 2022 · DPA Indicadores: total_domicílios_recenseados / dom_rec_2022).')}
-        <div class="val">${fmt(tot)}</div><div class="lbl">Total de domicílios</div></div>
-      <div class="kpi bom">${infoTip('Soma dos campos DPA “rede geral ou pluvial” e “fossa séptica ou fossa filtro ligada à rede” (SIDRA tabela 6805). É o mesmo destaque do card de esgoto no Inventário.')}
-        <div class="val">${fmt(lig.highlight)}</div><div class="sub">${fmt1(pctHighlight)}%</div><div class="lbl">Rede geral, rede pluvial ou fossa ligada à rede</div></div>
-      <div class="kpi alerta">${infoTip('Domicílios que não tinham banheiro nem sanitário, conforme SIDRA/Censo 2022 (esg_n_t_bs).')}
-        <div class="val">${fmt(v.esg_sem)}</div><div class="sub">${fmt1(pctSem)}%</div><div class="lbl">Não tinham banheiro nem sanitário</div></div>
-      <div class="kpi bom">${infoTip('Domicílios cuja forma de esgotamento é rede geral ou rede pluvial (campo DPA esg_rede_geral_ou_pluvia).')}
-        <div class="val">${fmt(lig.pluvial)}</div>
-        <div class="sub">${fmt1(pctPluvial)}%</div>
-        <div class="lbl">Rede geral ou pluvial</div></div>
-      <div class="kpi">${infoTip('Domicílios com fossa séptica ou fossa filtro ligada à rede (campo DPA esg_fossa_septica_ou_fossa_filtro_ligada_a_rede).')}
-        <div class="val">${fmt(lig.fossaLigada)}</div>
-        <div class="sub">${fmt1(pctFossaLig)}%</div>
-        <div class="lbl">Fossa séptica ou fossa filtro ligada à rede</div></div>
+      <article class="ligacao-group">
+        <header class="ligacao-group__head">
+          ${infoTip('Soma dos campos DPA “rede geral ou pluvial” e “fossa séptica ou fossa filtro ligada à rede” (SIDRA tabela 6805).')}
+          <p class="ligacao-group__label">Rede geral, rede pluvial ou fossa ligada à rede</p>
+          <p class="ligacao-group__value">${fmt(lig.highlight)}</p>
+          <p class="ligacao-group__share">${fmt1(pctHighlight)}% dos domicílios ocupados</p>
+        </header>
+        <p class="ligacao-group__caption">Desses, o tipo de esgotamento é:</p>
+        <div class="ligacao-split" aria-hidden="true">
+          <span style="width:${Math.max(2, pctPluvialLig)}%"></span>
+          <span style="width:${Math.max(2, pctFossaLig)}%"></span>
+        </div>
+        <div class="ligacao-group__parts">
+          <div class="ligacao-part ligacao-part--rede">
+            ${infoTip('Domicílios cuja forma de esgotamento é rede geral ou rede pluvial (campo DPA esg_rede_geral_ou_pluvia).')}
+            <p class="ligacao-part__name">Rede geral ou pluvial</p>
+            <p class="ligacao-part__value">${fmt(lig.pluvial)}</p>
+            <p class="ligacao-part__share">${fmt1(pctPluvialLig)}% de quem tem essa ligação</p>
+          </div>
+          <div class="ligacao-part ligacao-part--outra">
+            ${infoTip('Domicílios com fossa séptica ou fossa filtro ligada à rede (campo DPA esg_fossa_septica_ou_fossa_filtro_ligada_a_rede).')}
+            <p class="ligacao-part__name">Fossa séptica ou fossa filtro ligada à rede</p>
+            <p class="ligacao-part__value">${fmt(lig.fossaLigada)}</p>
+            <p class="ligacao-part__share">${fmt1(pctFossaLig)}% de quem tem essa ligação</p>
+          </div>
+        </div>
+      </article>
+      <article class="ligacao-peer">
+        ${infoTip('Domicílios que não tinham banheiro nem sanitário, conforme SIDRA/Censo 2022 (esg_n_t_bs).')}
+        <p class="ligacao-group__label">Não tinham banheiro nem sanitário</p>
+        <p class="ligacao-group__value">${fmt(v.esg_sem)}</p>
+        <p class="ligacao-group__share">${fmt1(pctSem)}% dos domicílios ocupados</p>
+      </article>
     `;
   
     const colors = categoryColors(formaCats);
@@ -905,28 +949,77 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
   // ================= município: detalhe =================
   function renderMuniDetail(){
     const panel = qs('#'+'muniDetailPanel');
-    if(!state.selectedMun){ panel.style.display='none'; return; }
-    const f = GEO.features.find(f=>f.properties.cod_mun===state.selectedMun);
-    if(!f){ panel.style.display='none'; return; }
-    const p = f.properties;
-    panel.style.display='';
-  
-    qs('#'+'muniDetailName').textContent = p.nm_mun;
-  
-    const embasa = embasaEsgotoStatus(p.embasa_esgoto);
-    const meta = [p.territorio, p.semiarido==='SIM' ? 'Semiárido' : null].filter(Boolean).join(' · ');
-    qs('#'+'muniDetailBody').innerHTML = `
-      <p class="muni-detail-meta" title="${meta}">${meta}</p>
-      <div class="embasa-status is-${embasa.kind}" role="status">
-        <span class="embasa-status__brand">Embasa</span>
-        <strong class="embasa-status__value">${embasa.label}</strong>
-      </div>
-      <div class="detail-grid">
-        <div class="detail-item"><div class="v">${fmt(p.populacao)}</div><div class="l">População</div></div>
-        <div class="detail-item"><div class="v">${fmt(p.total_domicilios || p.esg_total)}</div><div class="l">Domicílios</div></div>
-        <div class="detail-item wide"><div class="v text">${p.territorio}</div><div class="l">Território de Identidade</div></div>
+    if(!panel) return;
+    panel.style.display = '';
+    const closeBtn = qs('#'+'muniDetailClose');
+    const titleEl = qs('#'+'muniDetailTitle');
+    const bodyEl = qs('#'+'muniDetailBody');
+    const feats = currentSelectionFeatures();
+    const v = sumEsg(feats);
+    const pop = feats.reduce((s,f)=>s+(f.properties.populacao||0),0);
+    const kickerEl = panel.querySelector('.recorte-panel__kicker');
+    const statsHtml = `
+      <div class="recorte-stats">
+        <div class="recorte-stat">
+          <span class="recorte-stat__label">
+            <span class="recorte-stat__name">Municípios</span>
+            ${infoTip('Quantidade de municípios incluídos no recorte atual.')}
+          </span>
+          <strong class="recorte-stat__value">${fmt(feats.length)}</strong>
+        </div>
+        <div class="recorte-stat">
+          <span class="recorte-stat__label">
+            <span class="recorte-stat__name">População</span>
+            ${infoTip('Estimativa IBGE 2026 somada dos municípios do recorte.')}
+            <span class="recorte-stat__hint">2026</span>
+          </span>
+          <strong class="recorte-stat__value">${fmt(pop)}</strong>
+        </div>
+        <div class="recorte-stat">
+          <span class="recorte-stat__label">
+            <span class="recorte-stat__name">Domicílios ocupados</span>
+            ${infoTip('SIDRA 6805: soma das formas de esgotamento dos domicílios particulares permanentes ocupados.')}
+            <span class="recorte-stat__hint">SIDRA</span>
+          </span>
+          <strong class="recorte-stat__value">${fmt(totalDomicilios(v))}</strong>
+        </div>
       </div>
     `;
+
+    if(kickerEl) kickerEl.textContent = currentScopeKicker();
+    if(titleEl) titleEl.textContent = currentScopeTitle();
+
+    if(state.selectedMun){
+      const f = GEO.features.find(x=>x.properties.cod_mun===state.selectedMun);
+      const p = f?.properties;
+      if(closeBtn){
+        closeBtn.hidden = false;
+        closeBtn.classList.add('visible');
+      }
+      if(!p){
+        if(bodyEl) bodyEl.innerHTML = statsHtml;
+        return;
+      }
+      const embasa = embasaEsgotoStatus(p.embasa_esgoto);
+      const meta = [p.territorio, p.semiarido==='SIM' ? 'Semiárido' : null].filter(Boolean).join(' · ');
+      if(bodyEl) bodyEl.innerHTML = `
+        ${statsHtml}
+        <div class="recorte-extra">
+          <p class="muni-detail-meta" title="${meta}">${meta}</p>
+          <div class="embasa-status is-${embasa.kind}" role="status">
+            <span class="embasa-status__brand">Embasa</span>
+            <strong class="embasa-status__value">${embasa.label}</strong>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    if(closeBtn){
+      closeBtn.hidden = true;
+      closeBtn.classList.remove('visible');
+    }
+    if(bodyEl) bodyEl.innerHTML = statsHtml;
   }
   
   function renderCurrentTab(){
@@ -949,23 +1042,32 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
     if(!hasSelection) closeAglomeradosModal();
   }
   
-  function tipoAglomerado(nome){
-    const s = String(nome||'').toLowerCase();
-    if(/quilombola/.test(s)) return 'Comunidade quilombola';
-    if(/aldeia|indígena|indigena/.test(s)) return 'Aldeia indígena';
-    return 'Aglomerado rural';
+  let setoresModalSeq = 0;
+
+  function fillSetoresModalRows(rows, nm){
+    const tbody = qs('#'+'aglomeradosTbody');
+    const empty = qs('#'+'aglomeradosEmpty');
+    const table = qs('#'+'aglomeradosTable');
+    const title = qs('#'+'aglomeradosTitle');
+    const qtd = rows.length;
+    if(title) title.textContent = `Setores censitários — ${nm} · ${fmt(qtd)} ${qtd === 1 ? 'setor' : 'setores'}`;
+    if(tbody) tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td>${r.codigo || '—'}</td>
+        <td>${r.situacao || '—'}</td>
+        <td class="num">${fmt(r.populacao)}</td>
+        <td class="num">${fmt(r.domicilios)}</td>
+      </tr>
+    `).join('');
+    const has = qtd > 0;
+    if(table) table.style.display = has ? '' : 'none';
+    if(empty){
+      empty.style.display = has ? 'none' : '';
+      empty.textContent = 'Nenhum setor censitário encontrado para este município.';
+    }
   }
-  
-  function aglomeradosDoMunicipio(codMun){
-    const pts = PTS_DATA || [];
-    const cod = String(codMun||'');
-    return pts
-      .filter(p => String(p.m) === cod)
-      .slice()
-      .sort((a,b)=> String(a.n||'').localeCompare(String(b.n||''), 'pt-BR'));
-  }
-  
-  function openAglomeradosModal(){
+
+  async function openAglomeradosModal(){
     if(!state.selectedMun) return;
     const modal = qs('#'+'aglomeradosModal');
     const btn = qs('#'+'btnAglomerados');
@@ -973,36 +1075,49 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
       closeAglomeradosModal();
       return;
     }
-  
-    const f = GEO.features.find(f=>f.properties.cod_mun===state.selectedMun);
+
+    const f = GEO.features.find(x=>x.properties.cod_mun===state.selectedMun);
     const nm = f ? f.properties.nm_mun : state.selectedMun;
-    const rows = aglomeradosDoMunicipio(state.selectedMun);
-    const title = qs('#'+'aglomeradosTitle');
     const tbody = qs('#'+'aglomeradosTbody');
     const empty = qs('#'+'aglomeradosEmpty');
     const table = qs('#'+'aglomeradosTable');
-  
-    const qtd = rows.length;
-    title.textContent = `Aglomerados — ${nm} · ${qtd} ${qtd === 1 ? 'aglomerado' : 'aglomerados'}`;
-    tbody.innerHTML = rows.map(p => `
-      <tr>
-        <td>${p.n || '—'}</td>
-        <td>${tipoAglomerado(p.n)}</td>
-        <td>${p.mn || nm}</td>
-        <td class="num">${fmt(p.h)}</td>
-      </tr>
-    `).join('');
-  
-    const has = qtd > 0;
-    table.style.display = has ? '' : 'none';
-    empty.style.display = has ? 'none' : '';
-    empty.textContent = 'Nenhum aglomerado encontrado para este município.';
+    const title = qs('#'+'aglomeradosTitle');
+    if(title) title.textContent = `Setores censitários — ${nm}`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="4">Carregando setores censitários…</td></tr>`;
+    if(table) table.style.display = '';
+    if(empty) empty.style.display = 'none';
     modal.hidden = false;
     if(btn) btn.setAttribute('aria-expanded', 'true');
     requestAnimationFrame(()=> modal.classList.add('is-open'));
+    if(useWebMap && typeof mapApi.showSetores === 'function'){
+      void mapApi.showSetores(state.selectedMun, nm);
+    }
+
+    const seq = ++setoresModalSeq;
+    const queryMun = SETORES && typeof SETORES.__queryMun === 'function' ? SETORES.__queryMun : null;
+    try {
+      const rows = queryMun
+        ? await queryMun(state.selectedMun, nm)
+        : [];
+      if(seq !== setoresModalSeq || !state.selectedMun) return;
+      fillSetoresModalRows(rows || [], nm);
+    } catch (error) {
+      console.warn('[painel] setores do município:', error);
+      if(seq !== setoresModalSeq) return;
+      if(tbody) tbody.innerHTML = '';
+      if(table) table.style.display = 'none';
+      if(empty){
+        empty.style.display = '';
+        empty.textContent = 'Não foi possível carregar os setores censitários deste município.';
+      }
+    }
   }
   
   function closeAglomeradosModal(){
+    setoresModalSeq++;
+    if(useWebMap && typeof mapApi.hideSetores === 'function'){
+      mapApi.hideSetores();
+    }
     const modal = qs('#'+'aglomeradosModal');
     const btn = qs('#'+'btnAglomerados');
     if(btn) btn.setAttribute('aria-expanded', 'false');
@@ -1026,6 +1141,7 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
   
   function selectMunicipio(codMun){
     state.selectedMun = codMun;
+    hideMapHint();
     const f = GEO.features.find(f=>f.properties.cod_mun===codMun);
     qs('#'+'muniSearch-esgoto').value = f?f.properties.nm_mun:'';
     updateMuniSelectionUI();
@@ -1193,7 +1309,7 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
     }
     unbindMap.push(mapApi.onSelect(toggleMunicipio));
     unbindMap.push(mapApi.onHover((name, x, y)=>{
-      if(!name){ hideMapHint(); return; }
+      if(state.selectedMun || !name){ hideMapHint(); return; }
       showMapHint(x, y, name);
     }));
   }

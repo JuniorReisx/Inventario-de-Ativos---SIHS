@@ -2,7 +2,7 @@ import { React } from 'jimu-core'
 import { initPainelAgua } from '../../lib/painel'
 import { prepareAbastecimentoMap, resizeMapView } from '../../lib/map'
 import { loadMunicipiosFromLayer, applySemiaridoFromKeys } from '../../lib/geo'
-import { loadSetoresUrbanoRural } from '../../lib/setores'
+import { loadSetoresUrbanoRural, querySetoresDoMunicipio } from '../../lib/setores'
 import PortalLoader from '../portal-loader'
 import './style.css'
 
@@ -93,10 +93,15 @@ const PainelAgua = ({ folderUrl }: { folderUrl: string }) => {
           features: any[]
           __loaded: boolean
           __refresh?: () => void
+          __queryMun?: (codMun: string, nmMun?: string) => Promise<any[]>
         } = {
           type: 'FeatureCollection',
           features: [],
           __loaded: false
+        }
+        if (prepared.setoresLayer) {
+          setoresHolder.__queryMun = (codMun, nmMun) =>
+            querySetoresDoMunicipio(prepared.setoresLayer, { codMun, nmMun })
         }
         destroyPainel = initPainelAgua(
           root,
@@ -222,7 +227,7 @@ const PainelAgua = ({ folderUrl }: { folderUrl: string }) => {
                       <p className="aglomerados-hint" id="aglomeradosHint">Disponível após selecionar um município</p>
                       <div className="popup-panel" id="aglomeradosModal" hidden role="dialog" aria-labelledby="aglomeradosTitle">
                         <div className="popup-header">
-                          <h2 id="aglomeradosTitle">Aglomerados do município</h2>
+                          <h2 id="aglomeradosTitle">Setores censitários do município</h2>
                           <button type="button" className="popup-close" id="aglomeradosClose" aria-label="Fechar">×</button>
                         </div>
                         <div className="popup-body">
@@ -230,16 +235,16 @@ const PainelAgua = ({ folderUrl }: { folderUrl: string }) => {
                             <table className="data-table" id="aglomeradosTable">
                               <thead>
                                 <tr>
-                                  <th>Nome do aglomerado</th>
-                                  <th>Tipo de aglomerado</th>
-                                  <th>Município</th>
+                                  <th>Código do setor</th>
+                                  <th>Situação</th>
                                   <th>População</th>
+                                  <th>Domicílios</th>
                                 </tr>
                               </thead>
                               <tbody id="aglomeradosTbody"></tbody>
                             </table>
                           </div>
-                          <p className="empty-msg" id="aglomeradosEmpty" style={{ display: 'none' }}>Nenhum aglomerado encontrado para este município.</p>
+                          <p className="empty-msg" id="aglomeradosEmpty" style={{ display: 'none' }}>Nenhum setor censitário encontrado para este município.</p>
                         </div>
                       </div>
                     </div>

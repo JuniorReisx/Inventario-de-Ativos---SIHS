@@ -53,6 +53,18 @@ function mapFeature (attrs: Record<string, any>, fields: {
   if (!pluvial && fossaLigada > 0 && rrpflg > 0 && fossaLigada === rrpflg) {
     fossaLigada = 0
   }
+  const esg_fossa_sep = num(pick(attrs, 'esg_fffnlg'))
+  const esg_fossa_rud = num(pick(attrs, 'esg_fr_b'))
+  const esg_vala = num(pick(attrs, 'esg_vala'))
+  const esg_rio = num(pick(attrs, 'esg_r_l_cm'))
+  const esg_outra = num(pick(attrs, 'esg_outr'))
+  const esg_sem = num(pick(attrs, 'esg_n_t_bs'))
+  const sidraCats = (pluvial + fossaLigada > 0 ? pluvial + fossaLigada : rrpflg)
+    + esg_fossa_sep + esg_fossa_rud + esg_vala + esg_rio + esg_outra + esg_sem
+  const esgTotalField = num(pick(attrs, 'esg_total'))
+  const esg_total = sidraCats > 0 && esgTotalField > sidraCats * 1.2
+    ? sidraCats
+    : (esgTotalField > 0 ? esgTotalField : sidraCats)
   return {
     type: 'Feature',
     geometry: null,
@@ -89,16 +101,16 @@ function mapFeature (attrs: Record<string, any>, fields: {
       )),
       pop_urbana: num(pick(attrs, 'st_d_urba_1')),
       pop_rural: num(pick(attrs, 'st_d_rural_1')),
-      esg_total: num(pick(attrs, 'esg_total')),
+      esg_total,
       esg_rede_pluvial: pluvial,
       esg_fossa_ligada: fossaLigada,
       esg_rede: pluvial || fossaLigada ? pluvial : rrpflg,
-      esg_fossa_sep: num(pick(attrs, 'esg_fffnlg')),
-      esg_fossa_rud: num(pick(attrs, 'esg_fr_b')),
-      esg_vala: num(pick(attrs, 'esg_vala')),
-      esg_rio: num(pick(attrs, 'esg_r_l_cm')),
-      esg_outra: num(pick(attrs, 'esg_outr')),
-      esg_sem: num(pick(attrs, 'esg_n_t_bs')),
+      esg_fossa_sep,
+      esg_fossa_rud,
+      esg_vala,
+      esg_rio,
+      esg_outra,
+      esg_sem,
       embasa_esgoto: text(pick(attrs, 'esgotamento_sanitario'))
     }
   }
