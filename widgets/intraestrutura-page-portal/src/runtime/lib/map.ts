@@ -1101,18 +1101,47 @@ function setorLayersFromMap (webMap: any, isSetorLayer?: (layer: any) => boolean
   return layers
 }
 
-async function querySetorAtPoint (layer: any, mapPoint: any): Promise<any | null> {
-  if (!layer || !mapPoint || typeof layer.queryFeatures !== 'function') return null
+async function querySetorAtPoint (layer: any, view: any, event: any): Promise<any | null> {
+  if (!layer || typeof layer.queryFeatures !== 'function') return null
+  const mapPoint = event?.mapPoint || (typeof view?.toMap === 'function'
+    ? view.toMap({ x: event?.x, y: event?.y })
+    : null)
+  let geometry: any = mapPoint
+  try {
+    if (typeof view?.toMap === 'function' && event?.x != null && event?.y != null) {
+      const a = view.toMap({ x: event.x - 14, y: event.y - 14 })
+      const b = view.toMap({ x: event.x + 14, y: event.y + 14 })
+      if (a && b) {
+        geometry = {
+          type: 'extent',
+          xmin: Math.min(a.x, b.x),
+          xmax: Math.max(a.x, b.x),
+          ymin: Math.min(a.y, b.y),
+          ymax: Math.max(a.y, b.y),
+          spatialReference: a.spatialReference || view.spatialReference
+        }
+      }
+    }
+  } catch (_) {}
+  if (!geometry) return null
   try {
     await layer.load?.()
     const query = typeof layer.createQuery === 'function' ? layer.createQuery() : {}
-    query.geometry = mapPoint
+    query.geometry = geometry
     query.spatialRelationship = 'intersects'
     query.returnGeometry = true
     query.outFields = ['*']
-    query.num = 1
+    query.num = 40
     const result = await layer.queryFeatures(query)
-    return result?.features?.[0] || null
+    const features = result?.features || []
+    if (!features.length) return null
+    return features.slice().sort((left: any, right: any) => {
+      const le = left?.geometry?.extent
+      const re = right?.geometry?.extent
+      const la = le ? Math.abs((le.xmax - le.xmin) * (le.ymax - le.ymin)) : Number.POSITIVE_INFINITY
+      const ra = re ? Math.abs((re.xmax - re.xmin) * (re.ymax - re.ymin)) : Number.POSITIVE_INFINITY
+      return la - ra
+    })[0]
   } catch (_) {
     return null
   }
@@ -1157,11 +1186,8 @@ async function resolveSetorGraphicFromEvent (
     } catch (_) {}
   }
 
-  const mapPoint = event?.mapPoint || (typeof view?.toMap === 'function'
-    ? view.toMap({ x: event?.x, y: event?.y })
-    : null)
   for (const layer of layers) {
-    const graphic = await querySetorAtPoint(layer, mapPoint)
+    const graphic = await querySetorAtPoint(layer, view, event)
     if (graphic) return { layer, graphic }
   }
   return null

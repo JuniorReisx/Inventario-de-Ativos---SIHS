@@ -547,57 +547,6 @@ function paintSemiHighlight (highlightLayer: any, geometries: any[], on: boolean
   highlightLayer.effect = null
 }
 
-function selectionFillSymbol (fill: number[], outline: number[], width = 2.8) {
-  return {
-    type: 'simple-fill',
-    style: 'solid',
-    color: fill,
-    outline: { color: outline, width }
-  }
-}
-
-async function paintMunicipioSelection (
-  highlightLayer: any,
-  sourceLayer: any,
-  where: string | null,
-  colors: { fill: number[], outline: number[] }
-): Promise<void> {
-  if (!highlightLayer) return
-  highlightLayer.removeAll?.()
-  if (!where || !sourceLayer || typeof sourceLayer.queryFeatures !== 'function') {
-    highlightLayer.visible = false
-    return
-  }
-  try {
-    const previousWhere = sourceLayer.definitionExpression
-    sourceLayer.definitionExpression = null
-    const query = typeof sourceLayer.createQuery === 'function' ? sourceLayer.createQuery() : {}
-    query.where = where
-    query.returnGeometry = true
-    query.outFields = [sourceLayer.objectIdField || 'OBJECTID']
-    query.num = 1
-    const result = await sourceLayer.queryFeatures(query)
-    sourceLayer.definitionExpression = previousWhere
-    const geometry = result?.features?.[0]?.geometry
-    if (!geometry) {
-      highlightLayer.visible = false
-      return
-    }
-    highlightLayer.visible = true
-    highlightLayer.add({
-      geometry,
-      symbol: selectionFillSymbol(colors.fill, colors.outline, 3.2)
-    })
-    highlightLayer.add({
-      geometry,
-      symbol: selectionFillSymbol([0, 0, 0, 0], colors.outline, 1.4)
-    })
-  } catch (error) {
-    console.warn('[esgotamento] destaque do município falhou:', error)
-    highlightLayer.visible = false
-  }
-}
-
 export async function setupAuthentication (portalUrl = PORTAL_URL): Promise<void> {
   const [esriConfig] = await loadArcGISJSAPIModules(['esri/config'])
   esriConfig.portalUrl = normalizePortalUrl(portalUrl)
@@ -680,6 +629,13 @@ export async function createMapView (container: HTMLElement, webMap: any): Promi
   })
 
   await view.when()
+  try {
+    view.highlightOptions = {
+      color: [201, 154, 88, 1],
+      haloOpacity: 0.9,
+      fillOpacity: 0.16
+    }
+  } catch (_) {}
   await resizeMapView(view)
 
   const zoom = new Zoom({ view })
@@ -721,38 +677,117 @@ function escapeSql (value: string): string {
   return String(value ?? '').replaceAll("'", "''")
 }
 
+function sameMapLayer (left: any, right: any): boolean {
+  if (!left || !right) return false
+  if (left === right) return true
+  if (left.id && right.id && left.id === right.id) return true
+  if (left.layerId != null && right.layerId != null && left.layerId === right.layerId) return true
+  return false
+}
+
+function isLayerOrChild (candidate: any, target: any): boolean {
+  let current = candidate
+  for (let i = 0; i < 6 && current; i++) {
+    if (sameMapLayer(current, target)) return true
+    current = current.parent
+  }
+  return false
+}
+
 function graphicFromHit (hit: any, layer: any): any | null {
   const results = hit?.results || []
   const match = results.find((item: any) => {
     const graphic = item?.graphic
-    return graphic && (graphic.layer === layer || item.layer === layer)
+    const lyr = item?.layer || graphic?.layer
+    return graphic && (isLayerOrChild(lyr, layer) || isLayerOrChild(layer, lyr))
   })
   return match?.graphic || null
 }
 
-async function resolveSetorGraphic (view: any, layer: any, event: any): Promise<any | null> {
-  if (!view || !layer) return null
-  try {
-    const hit = await view.hitTest(event, { include: [layer] })
-    const graphic = graphicFromHit(hit, layer)
-    if (graphic?.attributes) return graphic
-  } catch (_) {}
+function featureEnvelopeArea (feature: any): number {
+  const extent = feature?.geometry?.extent
+  if (!extent) return Number.POSITIVE_INFINITY
+  const width = Math.abs((extent.xmax ?? 0) - (extent.xmin ?? 0))
+  const height = Math.abs((extent.ymax ?? 0) - (extent.ymin ?? 0))
+  const area = width * height
+  return area > 0 ? area : Number.POSITIVE_INFINITY
+}
+
+function pickSmallestFeature (features: any[]): any | null {
+  if (!features?.length) return null
+  return features.slice().sort((a, b) => featureEnvelopeArea(a) - featureEnvelopeArea(b))[0]
+}
+
+function clickSearchGeometry (view: any, event: any, pixels = 14): any | null {
   const mapPoint = event?.mapPoint || (typeof view?.toMap === 'function'
     ? view.toMap({ x: event?.x, y: event?.y })
     : null)
-  if (!mapPoint || typeof layer.queryFeatures !== 'function') return null
+  if (typeof view?.toMap !== 'function' || event?.x == null || event?.y == null) return mapPoint
   try {
+    const a = view.toMap({ x: event.x - pixels, y: event.y - pixels })
+    const b = view.toMap({ x: event.x + pixels, y: event.y + pixels })
+    if (!a || !b) return mapPoint
+    return {
+      type: 'extent',
+      xmin: Math.min(a.x, b.x),
+      xmax: Math.max(a.x, b.x),
+      ymin: Math.min(a.y, b.y),
+      ymax: Math.max(a.y, b.y),
+      spatialReference: a.spatialReference || view.spatialReference
+    }
+  } catch (_) {
+    return mapPoint
+  }
+}
+
+async function hydrateGraphicByObjectId (layer: any, graphic: any): Promise<any | null> {
+  if (!graphic) return null
+  if (!layer || typeof layer.queryFeatures !== 'function') return graphic
+  const oidField = String(layer.objectIdField || 'OBJECTID')
+  const oid = Number(graphic?.attributes?.[oidField] ?? graphic?.attributes?.OBJECTID ?? graphic?.attributes?.objectid)
+  if (!Number.isFinite(oid) || oid <= 0) return graphic
+  try {
+    await layer.load?.()
     const query = typeof layer.createQuery === 'function' ? layer.createQuery() : {}
-    query.geometry = mapPoint
-    query.spatialRelationship = 'intersects'
-    query.returnGeometry = false
+    query.objectIds = [oid]
     query.outFields = ['*']
-    query.num = 1
+    query.returnGeometry = true
     const result = await layer.queryFeatures(query)
-    return result?.features?.[0] || null
+    return result?.features?.[0] || graphic
+  } catch (_) {
+    return graphic
+  }
+}
+
+async function querySetorAtClick (layer: any, view: any, event: any): Promise<any | null> {
+  if (!layer || typeof layer.queryFeatures !== 'function') return null
+  const geometry = clickSearchGeometry(view, event)
+  if (!geometry) return null
+  try {
+    await layer.load?.()
+    const query = typeof layer.createQuery === 'function' ? layer.createQuery() : {}
+    query.geometry = geometry
+    query.spatialRelationship = 'intersects'
+    query.returnGeometry = true
+    query.outFields = ['*']
+    query.num = 40
+    const result = await layer.queryFeatures(query)
+    return pickSmallestFeature(result?.features || [])
   } catch (_) {
     return null
   }
+}
+
+async function resolveSetorGraphic (view: any, layer: any, event: any): Promise<any | null> {
+  if (!view || !layer) return null
+  let graphic: any | null = null
+  try {
+    const hit = await view.hitTest(event, { include: [layer] })
+    graphic = graphicFromHit(hit, layer)
+  } catch (_) {}
+  if (!graphic) graphic = await querySetorAtClick(layer, view, event)
+  if (!graphic) return null
+  return hydrateGraphicByObjectId(layer, graphic)
 }
 
 async function queryMunicipioAtPoint (layer: any, mapPoint: any): Promise<any | null> {
@@ -864,16 +899,31 @@ export function createMapApi (view: any, layer: any, options: {
     return '1=1'
   }
 
-  const munWhere = (codMun: string) => `${sqlField(codField)} = ${Number(codMun)}`
+  const munWhere = (codMun: string) => {
+    const raw = String(codMun || '').trim()
+    const num = Number(raw)
+    if (Number.isFinite(num) && num > 0) return `${sqlField(codField)} = ${Math.round(num)}`
+    return `${sqlField(codField)} = '${escapeSql(raw)}'`
+  }
 
   const zoomToWhere = async (where: string, targetLayer: any = layer, expand = 1.12, duration = 700) => {
-    if (!view || !targetLayer || typeof targetLayer.queryExtent !== 'function') return false
+    if (!view || !targetLayer) return false
     try {
-      const result = await targetLayer.queryExtent({ where })
-      if (!result?.extent || result.count === 0) return false
-      const target = typeof result.extent.expand === 'function'
-        ? result.extent.expand(expand)
-        : result.extent
+      let extent = null
+      if (typeof targetLayer.queryExtent === 'function') {
+        const result = await targetLayer.queryExtent({ where })
+        if (result?.extent && result.count !== 0) extent = result.extent
+      }
+      if (!extent && typeof targetLayer.queryFeatures === 'function') {
+        const query = typeof targetLayer.createQuery === 'function' ? targetLayer.createQuery() : {}
+        query.where = where
+        query.returnGeometry = true
+        query.num = 1
+        const result = await targetLayer.queryFeatures(query)
+        extent = result?.features?.[0]?.geometry?.extent || null
+      }
+      if (!extent) return false
+      const target = typeof extent.expand === 'function' ? extent.expand(expand) : extent
       await view.goTo(target, { duration })
       return true
     } catch (error) {
@@ -947,11 +997,6 @@ export function createMapApi (view: any, layer: any, options: {
     return munByName.get(normalizeMunName(name)) || null
   }
 
-  const selectionColors = options.selectionColors || {
-    fill: [139, 90, 43, 0.42],
-    outline: [255, 196, 0, 1]
-  }
-  let selectionToken = 0
   let highlightHandle: { remove?: () => void } | null = null
   let setorHighlightHandle: { remove?: () => void } | null = null
   let setoresActive = false
@@ -1067,53 +1112,35 @@ export function createMapApi (view: any, layer: any, options: {
     highlightHandle = null
   }
 
-  const applyMunicipioHighlight = async (codMun: string | null) => {
-    const token = ++selectionToken
+  const applySelectionHighlight = (state: PainelMapState) => {
     clearLayerViewHighlight()
-    const where = codMun ? munWhere(codMun) : null
-    await paintMunicipioSelection(
-      options.selectionHighlightLayer,
-      layer,
-      where,
-      selectionColors
-    )
-    if (token !== selectionToken) return
-
     if (options.selectionHighlightLayer) {
-      bringLayerToFront(options.webMap, options.selectionHighlightLayer)
+      options.selectionHighlightLayer.removeAll?.()
+      options.selectionHighlightLayer.visible = false
     }
 
-    if (!codMun || !layer) {
-      if (layer) layer.featureEffect = null
+    const munWhereClause = state.selectedMun ? munWhere(state.selectedMun) : null
+    const tiWhere = (tiField && state.regiao && state.regiao !== 'todas')
+      ? `${sqlField(tiField)} = '${escapeSql(state.regiao)}'`
+      : null
+    const where = munWhereClause || tiWhere
+
+    if (!layer) return
+    if (!where) {
+      layer.featureEffect = null
       return
     }
-
     try {
       layer.featureEffect = {
-        filter: { where: munWhere(codMun) },
-        includedEffect: 'drop-shadow(0px, 0px, 10px, #ffc400)',
-        excludedEffect: 'opacity(32%)'
+        filter: { where },
+        includedEffect: munWhereClause
+          ? 'drop-shadow(0px, 0px, 18px, #c99a58) drop-shadow(0px, 0px, 4px, #1A0F08) brightness(1.25) saturate(1.4)'
+          : 'drop-shadow(0px, 0px, 12px, #c99a58) brightness(1.12) saturate(1.2)',
+        excludedEffect: munWhereClause ? 'opacity(32%)' : 'opacity(40%)'
       }
     } catch (_) {
-      if (layer) layer.featureEffect = null
+      layer.featureEffect = null
     }
-
-    try {
-      const query = typeof layer.createQuery === 'function' ? layer.createQuery() : {}
-      query.where = munWhere(codMun)
-      query.returnGeometry = false
-      query.outFields = [layer.objectIdField || 'OBJECTID']
-      query.num = 1
-      const result = await layer.queryFeatures(query)
-      if (token !== selectionToken) return
-      const feature = result?.features?.[0]
-      if (!feature) return
-      const layerView = await view.whenLayerView(layer)
-      if (token !== selectionToken) return
-      if (typeof layerView?.highlight === 'function') {
-        highlightHandle = layerView.highlight(feature)
-      }
-    } catch (_) {}
   }
 
   const syncOverlayLayers = (state: PainelMapState) => {
@@ -1134,7 +1161,7 @@ export function createMapApi (view: any, layer: any, options: {
   return {
     sync (state: PainelMapState) {
       syncOverlayLayers(state)
-      void applyMunicipioHighlight(state.selectedMun || null)
+      applySelectionHighlight(state)
       if (!state.selectedMun) {
         hideSetoresLayer()
       }
@@ -1171,7 +1198,7 @@ export function createMapApi (view: any, layer: any, options: {
     },
 
     async zoomToMun (codMun: string) {
-      await zoomToWhere(munWhere(codMun))
+      await zoomToWhere(munWhere(codMun), layer, 1.55, 700)
     },
 
     async zoomToState (state: PainelMapState) {

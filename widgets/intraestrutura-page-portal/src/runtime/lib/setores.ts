@@ -21,11 +21,20 @@ function normalizeTipo (value: string): string {
 const SETOR_TIPOS_NORM = new Set(SETOR_TIPOS.map((name) => normalizeTipo(name)))
 
 export function isAllowedSetorTipo (tipo: string): boolean {
-  return SETOR_TIPOS_NORM.has(normalizeTipo(tipo))
+  const n = normalizeTipo(tipo)
+  if (!n) return false
+  if (SETOR_TIPOS_NORM.has(n)) return true
+  return n.includes('agrovila') || n.includes('indigen') || n.includes('quilombola')
 }
 
 function setorAllowedTiposWhere (): string {
-  return `(${SETOR_TIPOS.map((name) => `UPPER(nm_tipo) = UPPER('${escapeSqlString(name)}')`).join(' OR ')})`
+  const exact = SETOR_TIPOS.map((name) => `UPPER(nm_tipo) = UPPER('${escapeSqlString(name)}')`)
+  const fuzzy = [
+    "UPPER(nm_tipo) LIKE '%AGROVILA%'",
+    "UPPER(nm_tipo) LIKE '%INDIGEN%'",
+    "UPPER(nm_tipo) LIKE '%QUILOMBOLA%'"
+  ]
+  return `(${[...exact, ...fuzzy].join(' OR ')})`
 }
 
 export interface SetorItem {
@@ -172,11 +181,16 @@ function oidFromAttrs (layer: any, attrs: Record<string, any> | null | undefined
   return { field, value: Number.isFinite(value) && value > 0 ? value : 0 }
 }
 
+function isUnknownSetorTipo (tipo: string): boolean {
+  const n = String(tipo || '').trim()
+  return !n || n === '—' || /^\d+$/.test(n)
+}
+
 export function setorFromFeature (layer: any, graphic: any): SetorItem | null {
   const attrs = decodeAttributes(layer, graphic?.attributes)
   const item = toAgrupamento(attrs)
   if (!item) return null
-  if (item.type !== '—' && !isAllowedSetorTipo(item.type)) return null
+  if (!isUnknownSetorTipo(item.type) && !isAllowedSetorTipo(item.type)) return null
   const { field, value } = oidFromAttrs(layer, graphic?.attributes)
   return {
     ...item,
@@ -190,7 +204,7 @@ export async function hydrateSetorFromGraphic (layer: any, graphic: any): Promis
   if (!layer || !graphic) return null
   let attrs = { ...(graphic.attributes || {}) }
   let geometry = graphic.geometry
-  const { field, value } = oidFromAttrs(layer, attrs)
+  const { value } = oidFromAttrs(layer, attrs)
 
   if (typeof layer.queryFeatures === 'function' && (value > 0 || graphic.geometry)) {
     try {
@@ -202,19 +216,32 @@ export async function hydrateSetorFromGraphic (layer: any, graphic: any): Promis
       } else {
         query.geometry = graphic.geometry
         query.spatialRelationship = 'intersects'
-        query.num = 1
+        query.num = 8
       }
       query.outFields = ['*']
       query.returnGeometry = true
       const result = await layer.queryFeatures(query)
-      const feature = result?.features?.[0]
+      const features = result?.features || []
+      const feature = value > 0
+        ? features[0]
+        : features.slice().sort((a: any, b: any) => {
+          const ae = a?.geometry?.extent
+          const be = b?.geometry?.extent
+          const aa = ae ? Math.abs((ae.xmax - ae.xmin) * (ae.ymax - ae.ymin)) : Number.POSITIVE_INFINITY
+          const ba = be ? Math.abs((be.xmax - be.xmin) * (be.ymax - be.ymin)) : Number.POSITIVE_INFINITY
+          return aa - ba
+        })[0]
       if (feature?.attributes) attrs = { ...attrs, ...feature.attributes }
       if (feature?.geometry) geometry = feature.geometry
     } catch (_) {}
   }
 
   const item = setorFromFeature(layer, { attributes: attrs, geometry })
-  if (item && isAllowedSetorTipo(item.type)) return item
+  if (!item) return null
+  if (isAllowedSetorTipo(item.type)) return item
+  if (isUnknownSetorTipo(item.type) && (item.oid > 0 || item.name !== 'Não informado')) {
+    return { ...item, type: item.type === '—' ? 'Aglomerado' : item.type }
+  }
   return null
 }
 
