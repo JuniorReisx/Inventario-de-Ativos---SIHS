@@ -470,8 +470,8 @@
 
 .esgo-painel .ligacao-group{
   border: 0;
-  background: linear-gradient(90deg, #1a0e0a 0%, #3E2723 32%, #6D4C41 72%, #A1887F 100%);
-  box-shadow: 0 16px 40px rgba(62, 39, 35, 0.28);
+  background: linear-gradient(90deg, #1A0F08 0%, #2A1810 32%, #5C3A1A 72%, #c99a58 100%);
+  box-shadow: 0 16px 40px rgba(26, 15, 8, 0.28);
 }
 
 .esgo-painel .ligacao-group .ligacao-group__label,
@@ -495,8 +495,8 @@
   flex-direction: column;
   justify-content: center;
   border: 0;
-  background: linear-gradient(90deg, #1a0e0a 0%, #3E2723 32%, #6D4C41 72%, #A1887F 100%);
-  box-shadow: 0 16px 40px rgba(62, 39, 35, 0.28);
+  background: linear-gradient(90deg, #1A0F08 0%, #2A1810 32%, #5C3A1A 72%, #c99a58 100%);
+  box-shadow: 0 16px 40px rgba(26, 15, 8, 0.28);
 }
 
 .esgo-painel .ligacao-group__head{
@@ -572,11 +572,11 @@
 }
 
 .esgo-painel .ligacao-split span:first-child{
-  background: #1a0e0a;
+  background: #1A0F08;
 }
 
 .esgo-painel .ligacao-split span:last-child{
-  background: #6D4C41;
+  background: #c99a58;
 }
 
 .esgo-painel .ligacao-group__parts{
@@ -606,11 +606,11 @@
 }
 
 .esgo-painel .ligacao-part--rede{
-  background: linear-gradient(90deg, #1a0e0a 0%, #3E2723 42%, #6D4C41 100%);
+  background: linear-gradient(90deg, #1A0F08 0%, #2A1810 42%, #5C3A1A 100%);
 }
 
 .esgo-painel .ligacao-part--outra{
-  background: linear-gradient(90deg, #3E2723 0%, #6D4C41 48%, #A1887F 100%);
+  background: linear-gradient(90deg, #5C3A1A 0%, #c99a58 100%);
 }
 
 .esgo-painel .ligacao-part__name,
