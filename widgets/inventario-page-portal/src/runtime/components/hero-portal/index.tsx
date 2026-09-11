@@ -259,7 +259,7 @@ const HeroPortal = () => {
     <div className="hero-portal" ref={rootRef}>
       <section
         className={`hero-portal__hero${ready ? ' is-ready' : ''}`}
-        aria-label="Inventário de Ativos"
+        aria-label="Inventário de Infraestrutura Hídrica e Saneamento"
       >
         <canvas
           ref={canvasRef}
@@ -275,10 +275,10 @@ const HeroPortal = () => {
             <span className="hero-portal__dot" aria-hidden="true" />
             Secretaria de Infraestrutura Hídrica e Saneamento
           </div>
-          <h1 className="hero-portal__title">Inventário de Ativos</h1>
+          <h1 className="hero-portal__title">Inventário de Infraestrutura Hídrica e Saneamento</h1>
           <span className="hero-portal__accent" aria-hidden="true" />
           <p className="hero-portal__subtitle">
-            Infraestrutura Hídrica e Saneamento
+            Portal da Água · SIHS/BA
           </p>
           <p className="hero-portal__text">
             Consulte e explore informações sobre reservatórios,

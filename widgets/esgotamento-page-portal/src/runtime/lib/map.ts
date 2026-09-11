@@ -2,7 +2,7 @@ import { loadArcGISJSAPIModules } from 'jimu-arcgis'
 import { captureEsriLegendFromView } from './relatorio-pdf'
 
 export const PORTAL_URL = 'https://portaldaagua.sihs.ba.gov.br/portal'
-/** Web map ABASTECIMENTO / ESGOTAMENTO - Inventário de Ativos */
+/** Web map ABASTECIMENTO / ESGOTAMENTO - Inventário de Infraestrutura Hídrica e Saneamento */
 export const WEB_MAP_ID = '42e3cea83e0b4b86b4b34e015ac722c6'
 export const DPA_LAYER_TITLE = 'DPA_Indicadores_Censo_2022'
 export const SEMIARIDO_LAYER_TITLE = 'Região Semiárida_BA'
@@ -278,6 +278,26 @@ function setoresMunWhere (layer: any, codMun: string, nmMun?: string): string {
     return `UPPER(${sqlField(nameField)}) = UPPER('${escapeSql(nmMun)}')`
   }
   return '1=0'
+}
+
+function setorGraphicWhere (layer: any, graphic: any): string | null {
+  const attrs = graphic?.attributes || {}
+  const code = pickAttrValue(attrs, ['cd_setor', 'codigo_do_setor'])
+  const codeField = resolveField(layer, 'cd_setor', 'codigo do setor', 'codigo_do_setor')
+  if (codeField && code != null && String(code).trim() !== '') {
+    const field = (layer?.fields || []).find((item: any) => String(item?.name || '') === codeField)
+    const asString = String(field?.type || '').toLowerCase().includes('string')
+    if (asString) return `${sqlField(codeField)} = '${escapeSql(String(code))}'`
+    const n = Number(code)
+    if (Number.isFinite(n)) return `${sqlField(codeField)} = ${Math.round(n)}`
+    return `${sqlField(codeField)} = '${escapeSql(String(code))}'`
+  }
+  const oidField = layer?.objectIdField
+  const oid = oidField ? attrs[oidField] : null
+  if (oidField && oid != null && Number.isFinite(Number(oid))) {
+    return `${sqlField(oidField)} = ${Number(oid)}`
+  }
+  return null
 }
 
 function semiOutlineSymbol () {
@@ -933,10 +953,45 @@ export function createMapApi (view: any, layer: any, options: {
   }
   let selectionToken = 0
   let highlightHandle: { remove?: () => void } | null = null
+  let setorHighlightHandle: { remove?: () => void } | null = null
   let setoresActive = false
   let setorPopupEl: HTMLElement | null = null
 
+  const clearSetorHighlight = () => {
+    try { setorHighlightHandle?.remove?.() } catch (_) {}
+    setorHighlightHandle = null
+    const sl = options.setoresLayer
+    if (sl) {
+      try { sl.featureEffect = null } catch (_) {}
+    }
+  }
+
+  const selectSetorGraphic = async (graphic: any) => {
+    clearSetorHighlight()
+    const sl = options.setoresLayer
+    if (!sl || !graphic) return
+    const where = setorGraphicWhere(sl, graphic)
+    if (where) {
+      try {
+        sl.featureEffect = {
+          filter: { where },
+          includedEffect: 'drop-shadow(0px, 0px, 16px, #c99a58) brightness(1.28) saturate(1.35)',
+          excludedEffect: 'opacity(28%)'
+        }
+      } catch (_) {
+        try { sl.featureEffect = null } catch (__) {}
+      }
+    }
+    try {
+      const layerView = await view.whenLayerView(sl)
+      if (typeof layerView?.highlight === 'function') {
+        setorHighlightHandle = layerView.highlight(graphic)
+      }
+    } catch (_) {}
+  }
+
   const closeSetorPopup = () => {
+    clearSetorHighlight()
     if (!setorPopupEl) return
     setorPopupEl.classList.remove('is-open')
     setorPopupEl.hidden = true
@@ -990,6 +1045,7 @@ export function createMapApi (view: any, layer: any, options: {
     `
     el.hidden = false
     el.classList.add('is-open')
+    void selectSetorGraphic(graphic)
     el.querySelector('.setor-popup__close')?.addEventListener('click', (event) => {
       event.preventDefault()
       event.stopPropagation()

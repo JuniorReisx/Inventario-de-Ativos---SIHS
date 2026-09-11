@@ -264,7 +264,7 @@ const PainelAgua = ({ folderUrl }: { folderUrl: string }) => {
               </aside>
 
               <div className="panel stage-map area-map">
-                <div className="panel-header">Mapa — ABASTECIMENTO Inventário de Ativos</div>
+                <div className="panel-header">Mapa — ABASTECIMENTO Inventário de Infraestrutura Hídrica e Saneamento</div>
                 <div id="mapWrap-agua" className="panel-body map-slot">
                   <div className="abas-map-view" ref={mapRef} />
                   <div className="map-hint" role="tooltip" aria-hidden="true"></div>

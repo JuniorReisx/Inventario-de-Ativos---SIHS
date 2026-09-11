@@ -262,7 +262,7 @@ const PainelEsgoto = ({ folderUrl }: { folderUrl: string }) => {
               </aside>
 
               <div className="panel stage-map area-map">
-                <div className="panel-header">Mapa — ESGOTAMENTO Inventário de Ativos</div>
+                <div className="panel-header">Mapa — ESGOTAMENTO Inventário de Infraestrutura Hídrica e Saneamento</div>
                 <div id="mapWrap-esgoto" className="panel-body map-slot">
                   <div className="esgo-map-view" ref={mapRef} />
                   <div className="map-hint" role="tooltip" aria-hidden="true"></div>

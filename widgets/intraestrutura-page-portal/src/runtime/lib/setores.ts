@@ -88,6 +88,10 @@ function pickAttr (attrs: any, candidates: string[]): string {
 }
 
 export function setorWhere (item: SetorItem, tipo = ''): string {
+  const oidField = String(item.oidField || '').trim()
+  if (item.oid > 0 && /^[A-Za-z_][A-Za-z0-9_]*$/.test(oidField)) {
+    return `${oidField} = ${item.oid}`
+  }
   const mun = item.municipality && item.municipality !== '—'
     ? `UPPER(nm_mun) = UPPER('${escapeSqlString(item.municipality)}')`
     : ''
@@ -111,6 +115,107 @@ function toAgrupamento (attrs: any): SetorItem | null {
     oidField: 'objectid',
     oid: 0
   }
+}
+
+function compactTitle (value: string): string {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/gi, '')
+    .toLowerCase()
+}
+
+function layerTitleMatchesSetor (layer: any): boolean {
+  const title = compactTitle(layer?.title || layer?.name || '')
+  if (!title) return false
+  const wanted = compactTitle(SETOR_LAYER_TITLE)
+  return title === wanted || title.includes(wanted) || wanted.includes(title) ||
+    (title.includes('setor') && title.includes('censit'))
+}
+
+export function isSetorLayer (layer: any): boolean {
+  let current = layer
+  for (let i = 0; i < 6 && current; i++) {
+    if (layerTitleMatchesSetor(current)) return true
+    current = current.parent
+  }
+  return false
+}
+
+function decodeCodedValue (layer: any, fieldName: string, raw: any): string {
+  if (raw == null || raw === '') return ''
+  try {
+    const wanted = String(fieldName || '').toLowerCase()
+    const field = (layer?.fields || []).find((item: any) => String(item?.name || '').toLowerCase() === wanted)
+    const coded = field?.domain?.codedValues as Array<{ code: any, name: string }> | undefined
+    const match = coded?.find((item) => String(item.code) === String(raw))
+    if (match?.name) return String(match.name).trim()
+  } catch (_) {}
+  return text(raw)
+}
+
+function decodeAttributes (layer: any, attrs: Record<string, any> | null | undefined): Record<string, any> {
+  const source = attrs || {}
+  const next: Record<string, any> = { ...source }
+  for (const key of Object.keys(source)) {
+    const decoded = decodeCodedValue(layer, key, source[key])
+    if (decoded) next[key] = decoded
+  }
+  return next
+}
+
+function oidFromAttrs (layer: any, attrs: Record<string, any> | null | undefined): { field: string, value: number } {
+  const field = String(layer?.objectIdField || 'OBJECTID')
+  const a = attrs || {}
+  const raw = a[field] ?? a.OBJECTID ?? a.objectid ?? a.ObjectID ?? a.FID ?? a.fid
+  const value = Number(raw)
+  return { field, value: Number.isFinite(value) && value > 0 ? value : 0 }
+}
+
+export function setorFromFeature (layer: any, graphic: any): SetorItem | null {
+  const attrs = decodeAttributes(layer, graphic?.attributes)
+  const item = toAgrupamento(attrs)
+  if (!item) return null
+  if (item.type !== '—' && !isAllowedSetorTipo(item.type)) return null
+  const { field, value } = oidFromAttrs(layer, graphic?.attributes)
+  return {
+    ...item,
+    oidField: field,
+    oid: value,
+    geometry: graphic?.geometry
+  }
+}
+
+export async function hydrateSetorFromGraphic (layer: any, graphic: any): Promise<SetorItem | null> {
+  if (!layer || !graphic) return null
+  let attrs = { ...(graphic.attributes || {}) }
+  let geometry = graphic.geometry
+  const { field, value } = oidFromAttrs(layer, attrs)
+
+  if (typeof layer.queryFeatures === 'function' && (value > 0 || graphic.geometry)) {
+    try {
+      await layer.load?.()
+      const query = typeof layer.createQuery === 'function' ? layer.createQuery() : {}
+      if (value > 0) {
+        query.objectIds = [value]
+        query.where = undefined
+      } else {
+        query.geometry = graphic.geometry
+        query.spatialRelationship = 'intersects'
+        query.num = 1
+      }
+      query.outFields = ['*']
+      query.returnGeometry = true
+      const result = await layer.queryFeatures(query)
+      const feature = result?.features?.[0]
+      if (feature?.attributes) attrs = { ...attrs, ...feature.attributes }
+      if (feature?.geometry) geometry = feature.geometry
+    } catch (_) {}
+  }
+
+  const item = setorFromFeature(layer, { attributes: attrs, geometry })
+  if (item && isAllowedSetorTipo(item.type)) return item
+  return null
 }
 
 export async function searchSetores (

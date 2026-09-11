@@ -1086,6 +1086,87 @@ async function queryMunicipioFullAttributes (
 
 export type MunicipioClickHandle = { remove: () => void }
 
+function setorLayersFromMap (webMap: any, isSetorLayer?: (layer: any) => boolean): any[] {
+  if (!webMap || !isSetorLayer) return []
+  const seen = new Set<any>()
+  const layers: any[] = []
+  for (const layer of getAllLayers(webMap)) {
+    if (!layer || seen.has(layer) || !isSetorLayer(layer)) continue
+    if (layer.visible === false) continue
+    if (String(layer.type || '').toLowerCase() === 'graphics') continue
+    if (typeof layer.queryFeatures !== 'function') continue
+    seen.add(layer)
+    layers.push(layer)
+  }
+  return layers
+}
+
+async function querySetorAtPoint (layer: any, mapPoint: any): Promise<any | null> {
+  if (!layer || !mapPoint || typeof layer.queryFeatures !== 'function') return null
+  try {
+    await layer.load?.()
+    const query = typeof layer.createQuery === 'function' ? layer.createQuery() : {}
+    query.geometry = mapPoint
+    query.spatialRelationship = 'intersects'
+    query.returnGeometry = true
+    query.outFields = ['*']
+    query.num = 1
+    const result = await layer.queryFeatures(query)
+    return result?.features?.[0] || null
+  } catch (_) {
+    return null
+  }
+}
+
+async function resolveSetorGraphicFromEvent (
+  view: any,
+  event: any,
+  hitAll: any,
+  options: {
+    webMap?: any
+    isSetorLayer?: (layer: any) => boolean
+  }
+): Promise<{ layer: any, graphic: any } | null> {
+  const isSetorLayer = options.isSetorLayer
+  if (!isSetorLayer) return null
+  const layers = setorLayersFromMap(options.webMap, isSetorLayer)
+
+  const fromHits = (results: any[]): { layer: any, graphic: any } | null => {
+    for (const result of results || []) {
+      const graphic = result?.graphic
+      const lyr = result?.layer || graphic?.layer
+      if (!graphic || !lyr) continue
+      if (String(lyr.type || '').toLowerCase() === 'graphics') continue
+      if (!isSetorLayer(lyr) && !layers.includes(lyr)) continue
+      const layer = layers.find((item) => item === lyr)
+        || (typeof lyr.queryFeatures === 'function' ? lyr : layers[0])
+        || lyr
+      return { layer, graphic }
+    }
+    return null
+  }
+
+  const fromBroad = fromHits(hitAll?.results || [])
+  if (fromBroad) return fromBroad
+
+  if (layers.length && view?.hitTest) {
+    try {
+      const hit = await view.hitTest(event, { include: layers })
+      const found = fromHits(hit?.results || [])
+      if (found) return found
+    } catch (_) {}
+  }
+
+  const mapPoint = event?.mapPoint || (typeof view?.toMap === 'function'
+    ? view.toMap({ x: event?.x, y: event?.y })
+    : null)
+  for (const layer of layers) {
+    const graphic = await querySetorAtPoint(layer, mapPoint)
+    if (graphic) return { layer, graphic }
+  }
+  return null
+}
+
 export function enableMunicipioCustomPopup (
   view: any,
   options: {
@@ -1106,6 +1187,9 @@ export function enableMunicipioCustomPopup (
     isAssetLayer?: (layer: any) => boolean
     onAssetHit?: (layer: any, graphic: any) => void
     onAssetDeselect?: () => void
+    isSetorLayer?: (layer: any) => boolean
+    onSetorHit?: (layer: any, graphic: any) => boolean | void | Promise<boolean | void>
+    isSetorSelected?: () => boolean
   }
 ): MunicipioClickHandle {
   if (!view) return { remove: () => {} }
@@ -1122,12 +1206,20 @@ export function enableMunicipioCustomPopup (
         const results = hitAll?.results || []
         for (const result of results) {
           const graphic = result?.graphic
-          const lyr = graphic?.layer
+          const lyr = result?.layer || graphic?.layer
           if (!graphic || !lyr) continue
           if (String(lyr.type || '').toLowerCase() === 'graphics') continue
           if (!options.isAssetLayer(lyr)) continue
           options.onAssetHit(lyr, graphic)
           return
+        }
+      }
+
+      if (options.onSetorHit && options.isSetorLayer) {
+        const setorHit = await resolveSetorGraphicFromEvent(view, event, hitAll, options)
+        if (setorHit) {
+          const handled = await options.onSetorHit(setorHit.layer, setorHit.graphic)
+          if (handled !== false) return
         }
       }
 
@@ -1140,10 +1232,10 @@ export function enableMunicipioCustomPopup (
       const found = await extractMunicipioFromHit(hit, activeLayer)
       if (!found) {
         options.onClose()
-        if (options.isAssetSelected?.()) options.onAssetDeselect?.()
+        if (options.isAssetSelected?.() || options.isSetorSelected?.()) options.onAssetDeselect?.()
         return
       }
-      if (options.isAssetSelected?.()) {
+      if (options.isAssetSelected?.() || options.isSetorSelected?.()) {
         options.onClose()
         options.onAssetDeselect?.()
         return

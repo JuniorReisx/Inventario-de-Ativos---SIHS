@@ -132,7 +132,7 @@ const ConteudoSobre = () => {
         <p className="sobre-kicker">Portal da Água · SIHS/BA</p>
         <h2>Um painel para ver água e saneamento no território</h2>
         <p className="sobre-lead">
-          O Portal da Água reúne o inventário de ativos hídricos e os indicadores do
+          O Portal da Água reúne o inventário de infraestrutura hídrica e saneamento e os indicadores do
           Censo IBGE 2022 para apoiar a gestão, o planejamento e a decisão na Bahia.
           Ele foi pensado para responder, no mesmo recorte de mapa:{' '}
           <b>onde está a infraestrutura</b>, <b>como a população se abastece</b> e{' '}

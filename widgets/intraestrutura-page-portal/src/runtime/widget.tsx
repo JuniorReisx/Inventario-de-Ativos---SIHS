@@ -45,6 +45,8 @@ import {
   SETOR_TIPOS,
   searchSetores,
   setorWhere,
+  isSetorLayer,
+  hydrateSetorFromGraphic,
   type SetorItem
 } from './lib/setores'
 import { loadAssetLegend, legendGroupsForPdf, type AssetLegendGroup } from './lib/legend'
@@ -80,6 +82,12 @@ function popupDataFromMunicipio (item: MunicipioItem): MunicipioPopupData {
 const { useCallback, useEffect, useMemo, useRef, useState } = React
 
 function withPinnedAtivo (items: AtivoItem[], pinned: AtivoItem | null): AtivoItem[] {
+  if (!pinned) return items
+  const match = items.find((item) => item.key === pinned.key)
+  return [match || pinned, ...items.filter((item) => item.key !== pinned.key)]
+}
+
+function withPinnedSetor (items: SetorItem[], pinned: SetorItem | null): SetorItem[] {
   if (!pinned) return items
   const match = items.find((item) => item.key === pinned.key)
   return [match || pinned, ...items.filter((item) => item.key !== pinned.key)]
@@ -322,8 +330,11 @@ const Widget = (props: AllWidgetProps<any>) => {
   const clearMunSelectionRef = useRef<() => void>(() => {})
   const selectMunFromMapRef = useRef<(name: string) => void>(() => {})
   const selectAtivoFromMapRef = useRef<(item: AtivoItem) => void>(() => {})
+  const selectSetorFromMapRef = useRef<(item: SetorItem) => void>(() => {})
   const deselectAtivoRef = useRef<() => void>(() => {})
   const pinnedAtivoRef = useRef<AtivoItem | null>(null)
+  const pinnedSetorRef = useRef<SetorItem | null>(null)
+  const selectedSetorKeyRef = useRef<string | null>(null)
   const assetTypeRef = useRef<AssetType>('')
   const savedAssetTypeRef = useRef<AssetType | null>(null)
   const [zooming, setZooming] = useState(false)
@@ -379,6 +390,8 @@ const Widget = (props: AllWidgetProps<any>) => {
     setSelectedAtivoKey(null)
     selectedAtivoKeyRef.current = null
     setSelectedSetorKey(null)
+    selectedSetorKeyRef.current = null
+    pinnedSetorRef.current = null
   }, [restoreAssetTypeFilter])
 
   const closeMunPopup = useCallback(() => {
@@ -474,12 +487,13 @@ const Widget = (props: AllWidgetProps<any>) => {
             },
             onClose: closeMunPopup,
             isSelected: (name) => {
-              if (selectedAtivoKeyRef.current) return false
+              if (selectedAtivoKeyRef.current || selectedSetorKeyRef.current) return false
               const current = selectedNameRef.current
               if (!current || !name) return false
               return current.localeCompare(name, 'pt-BR', { sensitivity: 'accent' }) === 0
             },
             isAssetSelected: () => Boolean(selectedAtivoKeyRef.current),
+            isSetorSelected: () => Boolean(selectedSetorKeyRef.current),
             onDeselect: () => { clearMunSelectionRef.current() },
             isAssetLayer,
             onAssetHit: (_layer, graphic) => {
@@ -487,7 +501,14 @@ const Widget = (props: AllWidgetProps<any>) => {
               if (!item) return
               selectAtivoFromMapRef.current(item)
             },
-            onAssetDeselect: () => { deselectAtivoRef.current() }
+            onAssetDeselect: () => { deselectAtivoRef.current() },
+            isSetorLayer,
+            onSetorHit: async (_layer, graphic) => {
+              const item = await hydrateSetorFromGraphic(_layer, graphic)
+              if (!item) return false
+              selectSetorFromMapRef.current(item)
+              return true
+            }
           })
         }
 
@@ -580,7 +601,7 @@ const Widget = (props: AllWidgetProps<any>) => {
 
   useEffect(() => {
     if (listTab !== 'municipios') return
-    if (!selectedAtivoKeyRef.current && !selectedSetorKey) return
+    if (!selectedAtivoKeyRef.current && !selectedSetorKeyRef.current) return
     deselectAtivoRef.current()
   }, [listTab])
 
@@ -756,7 +777,7 @@ const Widget = (props: AllWidgetProps<any>) => {
     if (!webMap || loading) return
 
     if (setorSearch.length < 2 && !selectedName && !filterTerritorio) {
-      setSetores([])
+      setSetores(withPinnedSetor([], pinnedSetorRef.current))
       setSetoresLoading(false)
       return
     }
@@ -779,7 +800,7 @@ const Widget = (props: AllWidgetProps<any>) => {
             scoped
           })
         })
-        if (!cancelled) setSetores(items)
+        if (!cancelled) setSetores(withPinnedSetor(items, pinnedSetorRef.current))
       } catch (err) {
         console.error('[infra-page] Falha ao buscar setores:', err)
         if (!cancelled) setSetores([])
@@ -945,6 +966,8 @@ const Widget = (props: AllWidgetProps<any>) => {
     setSelectedAtivoKey(null)
     selectedAtivoKeyRef.current = null
     setSelectedSetorKey(null)
+    selectedSetorKeyRef.current = null
+    pinnedSetorRef.current = null
     setZooming(true)
     try {
       await restoreScopeView()
@@ -1095,14 +1118,20 @@ const Widget = (props: AllWidgetProps<any>) => {
     const webMap = webMapRef.current
     if (!view || !webMap) return
 
-    if (selectedSetorKey === item.key) {
+    if (selectedSetorKeyRef.current === item.key) {
       await deselectAtivoKeepScope()
       return
     }
 
+    selectedSetorKeyRef.current = item.key
+    pinnedSetorRef.current = item
     setSelectedSetorKey(item.key)
     setSelectedAtivoKey(null)
     selectedAtivoKeyRef.current = null
+    setListTab('setores')
+    setPage(0)
+    setSetores((prev) => withPinnedSetor(prev, item))
+    closeMunPopup()
     const requestId = ++popupRequestRef.current
     setAssetPopup({ key: item.key, loading: true, rows: [] })
     setZooming(true)
@@ -1120,7 +1149,7 @@ const Widget = (props: AllWidgetProps<any>) => {
         return
       }
       layer.visible = true
-      const where = setorWhere(item, setorTipo)
+      const where = setorWhere(item)
       const [rows] = await Promise.all([
         loadPopupRows(webMap, {
           layerTitle: SETOR_LAYER_TITLE,
@@ -1154,7 +1183,19 @@ const Widget = (props: AllWidgetProps<any>) => {
     } finally {
       setZooming(false)
     }
-  }, [selectedSetorKey, setorTipo, deselectAtivoKeepScope])
+  }, [deselectAtivoKeepScope, closeMunPopup])
+
+  selectSetorFromMapRef.current = (item: SetorItem) => {
+    if (selectedSetorKeyRef.current === item.key) {
+      void deselectAtivoKeepScope()
+      return
+    }
+    pinnedSetorRef.current = item
+    setListTab('setores')
+    setPage(0)
+    setSetores((prev) => withPinnedSetor(prev, item))
+    void handleSelectSetor(item)
+  }
 
   const handleSelect = useCallback(async (item: MunicipioItem) => {
     if (

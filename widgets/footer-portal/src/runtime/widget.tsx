@@ -20,7 +20,7 @@ const Widget = (props: AllWidgetProps<any>) => {
               <p className="fp-footer__eyebrow">Governo do Estado da Bahia</p>
               <h2 className="fp-footer__title">SIHS — Secretaria de Infraestrutura Hídrica e Saneamento</h2>
               <p className="fp-footer__desc">
-                Inventário de ativos de infraestrutura hídrica e saneamento para apoiar a gestão,
+                Inventário de infraestrutura hídrica e saneamento para apoiar a gestão,
                 o planejamento e a tomada de decisão na Bahia.
               </p>
             </div>
