@@ -226,10 +226,19 @@ function formatSetorValue (layer: any, fieldHint: string, raw: any): string {
     const match = coded?.find((item) => String(item.code) === String(raw))
     if (match?.name) return match.name
   } catch (_) {}
+  const hint = normalizeText(fieldHint)
+  const asCode = hint.includes('setor') || hint.includes('aglom') || hint.includes('codigo') || hint.startsWith('cd')
+  const integerCode = (n: number) => Math.round(n).toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 0 })
   if (typeof raw === 'number' && Number.isFinite(raw)) {
+    if (asCode || Math.abs(raw) >= 1e10) return integerCode(raw)
     return new Intl.NumberFormat('pt-BR', { maximumFractionDigits: Number.isInteger(raw) ? 0 : 2 }).format(raw)
   }
   const text = String(raw).trim()
+  const sci = text.replace(/\s/g, '').replace(',', '.')
+  if (/^-?\d+(?:\.\d+)?e[+-]?\d+$/i.test(sci)) {
+    const n = Number(sci)
+    if (Number.isFinite(n)) return integerCode(n)
+  }
   return text || '—'
 }
 
@@ -242,6 +251,7 @@ function setorPopupSpecs (theme: 'agua' | 'esgoto'): SetorPopupSpec[] {
     { label: 'Tipo de setor', candidates: ['nm_tipo', 'tipo_sc', 'tipo_setor', 'tipo'] },
     { label: 'Distrito', candidates: ['nm_dist', 'nm_distrito', 'distrito'] },
     { label: 'Aglomerado', candidates: ['nm_aglom', 'nome_aglomerado', 'aglomerado'] },
+    { label: 'Código do aglomerado', candidates: ['cd_aglom', 'cd_aglomerado', 'codigo_aglomerado', 'codigo_do_aglomerado'] },
     { label: 'População', candidates: ['v0001', 'populacao', 'pop'] },
     { label: 'Domicílios', candidates: ['v0002', 'domicilios', 'total_domicilios'] }
   ]
@@ -299,6 +309,12 @@ function setorGraphicWhere (layer: any, graphic: any): string | null {
     return `${sqlField(oidField)} = ${Number(oid)}`
   }
   return null
+}
+
+function setorCodeWhere (layer: any, codigo: string): string | null {
+  const code = String(codigo || '').trim()
+  if (!code || code === '—') return null
+  return setorGraphicWhere(layer, { attributes: { cd_setor: code, codigo_do_setor: code } })
 }
 
 function semiOutlineSymbol () {
@@ -875,6 +891,7 @@ export type PainelMapApi = {
   setMunicipios: (items: Array<{ cod_mun?: string, nm_mun?: string }>) => void
   showSetores: (codMun: string, nmMun?: string) => Promise<void>
   hideSetores: () => void
+  selectSetorByCodigo: (codigo: string, oid?: number) => Promise<void>
   onSelect: (handler: (codMun: string) => void) => () => void
   onHover: (handler: (name: string | null, clientX: number, clientY: number) => void) => () => void
 }
@@ -910,6 +927,23 @@ export function createMapApi (view: any, layer: any, options: {
     const num = Number(raw)
     if (Number.isFinite(num) && num > 0) return `${sqlField(codField)} = ${Math.round(num)}`
     return `${sqlField(codField)} = '${escapeSql(raw)}'`
+  }
+
+  const zoomToSetorGeometry = async (graphic: any, duration = 900) => {
+    if (!view || !graphic?.geometry) return false
+    try {
+      const geom = graphic.geometry
+      const extent = geom.extent?.clone?.() || geom.extent
+      if (extent && typeof extent.expand === 'function') {
+        await view.goTo(extent.expand(1.22), { duration })
+        return true
+      }
+      await view.goTo({ target: geom, zoom: Math.max(Number(view.zoom) || 0, 15) }, { duration })
+      return true
+    } catch (error) {
+      console.warn('[abastecimento] zoom do aglomerado falhou:', error)
+      return false
+    }
   }
 
   const zoomToWhere = async (where: string, targetLayer: any = layer, expand = 1.12, duration = 700) => {
@@ -1208,6 +1242,74 @@ export function createMapApi (view: any, layer: any, options: {
       hideSetoresLayer()
     },
 
+    async selectSetorByCodigo (codigo: string, oid = 0) {
+      const sl = options.setoresLayer
+      if (!sl || typeof sl.queryFeatures !== 'function') {
+        console.warn('[abastecimento] camada de setores indisponível para seleção')
+        return
+      }
+      try { await sl.load?.() } catch (_) {}
+      keepSetoresOriginalSymbology(sl)
+      try { if ('outFields' in sl) sl.outFields = ['*'] } catch (_) {}
+      if (typeof sl.popupEnabled === 'boolean') sl.popupEnabled = false
+      sl.listMode = 'hide'
+      setLayerVisible(sl, true)
+      bringLayerToFront(options.webMap, sl)
+      setoresActive = true
+
+      const queryGraphic = async (setup: (query: any) => void) => {
+        const query = typeof sl.createQuery === 'function' ? sl.createQuery() : {}
+        query.outFields = ['*']
+        query.returnGeometry = true
+        query.num = 1
+        setup(query)
+        const result = await sl.queryFeatures(query)
+        return result?.features?.[0] || null
+      }
+
+      let graphic: any = null
+      const oidNum = Number(oid)
+      if (Number.isFinite(oidNum) && oidNum > 0) {
+        try {
+          graphic = await queryGraphic((query) => {
+            query.objectIds = [oidNum]
+            query.where = null
+          })
+        } catch (error) {
+          console.warn('[abastecimento] query setor por OID:', error)
+        }
+      }
+      if (!graphic) {
+        const field = resolveField(sl, 'cd_setor', 'codigo do setor', 'codigo_do_setor')
+        const code = String(codigo || '').trim()
+        const tries: string[] = []
+        if (field && code && code !== '—') {
+          tries.push(`${sqlField(field)} = '${escapeSql(code)}'`)
+          if (/^\d+$/.test(code)) tries.push(`${sqlField(field)} = ${code}`)
+        }
+        for (const where of tries) {
+          try {
+            graphic = await queryGraphic((query) => { query.where = where })
+            if (graphic) break
+          } catch (error) {
+            console.warn('[abastecimento] query setor por código:', where, error)
+          }
+        }
+      }
+      if (!graphic) {
+        console.warn('[abastecimento] setor não encontrado na lista', { codigo, oid })
+        return
+      }
+      let zoomed = await zoomToSetorGeometry(graphic, 900)
+      if (!zoomed) {
+        const where = setorGraphicWhere(sl, graphic)
+          || (oidNum > 0 ? `${sqlField(String(sl.objectIdField || 'OBJECTID'))} = ${oidNum}` : '')
+        if (where) zoomed = await zoomToWhere(where, sl, 1.22, 900)
+      }
+      await waitForIdle()
+      openSetorPopup(graphic)
+    },
+
     async zoomToMun (codMun: string) {
       await zoomToWhere(munWhere(codMun), layer, 1.55, 700)
     },
@@ -1251,7 +1353,7 @@ export function createMapApi (view: any, layer: any, options: {
           }
         }
         await waitForIdle()
-        const shot = await view.takeScreenshot({ format: 'jpg', quality: 88 })
+        const shot = await view.takeScreenshot({ format: 'jpg', quality: 92, width: 1920 })
         return shot?.dataUrl || null
       } catch (error) {
         console.warn('[abastecimento] captura do mapa:', error)

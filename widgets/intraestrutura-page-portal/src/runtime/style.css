@@ -176,7 +176,7 @@
   min-height: 220px;
 }
 
-.infra-chart__body:has(.portal-loader) {
+.infra-chart__body:has(.portal-loader-infra) {
   align-items: center;
   justify-content: center;
 }
@@ -587,7 +587,7 @@
   box-shadow: inset 3px 0 0 var(--cyan);
 }
 
-.infra-ativo-popup:has(.portal-loader) {
+.infra-ativo-popup:has(.portal-loader-infra) {
   display: flex;
   align-items: center;
   justify-content: center;

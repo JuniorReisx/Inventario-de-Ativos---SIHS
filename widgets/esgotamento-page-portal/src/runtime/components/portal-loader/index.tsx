@@ -10,20 +10,20 @@ export default function PortalLoader (props: {
   const label = props.label || 'Carregando'
   const mark = (
     <div
-      className={`portal-loader${props.compact ? ' is-compact' : ''}`}
+      className={`portal-loader-esgoto${props.compact ? ' is-compact' : ''}`}
       role="status"
       aria-live="polite"
       aria-busy="true"
       aria-label={label}
     >
-      <div className="loader">
-        <div className="waves" />
+      <div className="portal-loader__bowl">
+        <div className="portal-loader__waves" />
       </div>
       {!props.compact
-        ? <span className="portal-loader__label">{label}</span>
+        ? <span className="portal-loader-esgoto__label">{label}</span>
         : null}
     </div>
   )
   if (!props.overlay) return mark
-  return <div className="portal-loader-overlay">{mark}</div>
+  return <div className="portal-loader-esgoto-overlay">{mark}</div>
 }

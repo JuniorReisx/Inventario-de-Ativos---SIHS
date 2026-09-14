@@ -229,11 +229,25 @@ const PainelEsgoto = ({ folderUrl }: { folderUrl: string }) => {
                           <button type="button" className="popup-close" id="aglomeradosClose" aria-label="Fechar">×</button>
                         </div>
                         <div className="popup-body">
+                          <div className="aglomerados-filters">
+                            <label className="aglomerados-filter">
+                              <span>Tipo do setor</span>
+                              <select id="aglomeradosTipoFilter" aria-label="Filtrar por tipo do setor">
+                                <option value="">Todos os tipos</option>
+                              </select>
+                            </label>
+                            <label className="aglomerados-filter aglomerados-filter--search">
+                              <span>Pesquisar</span>
+                              <input id="aglomeradosSearch" type="search" placeholder="Nome ou código" autoComplete="off" aria-label="Pesquisar por nome ou código" />
+                            </label>
+                          </div>
                           <div className="table-wrap">
                             <table className="data-table" id="aglomeradosTable">
                               <thead>
                                 <tr>
-                                  <th>Código do setor</th>
+                                  <th>Código do aglomerado</th>
+                                  <th>Nome do aglomerado</th>
+                                  <th>Tipo do setor</th>
                                   <th>Situação</th>
                                   <th>População</th>
                                   <th>Domicílios</th>

@@ -328,7 +328,7 @@
   min-height: 0;
 }
 
-.kpi-popover__body:has(.portal-loader) {
+.kpi-popover__body:has(.portal-loader-inventario) {
   display: flex;
   align-items: center;
   justify-content: center;

@@ -570,19 +570,75 @@
 }
 
 .infra-sistemas__legend {
-  max-height: 240px;
+  max-height: 280px;
   overflow: auto;
-  padding: 0.45rem 0.55rem 0.6rem;
+  padding: 0.55rem 0.7rem 0.7rem;
 }
 
-.infra-sistemas__legend .esri-legend,
-.infra-sistemas__legend .esri-widget {
-  background: transparent;
-  box-shadow: none;
+.infra-sistemas__legend h4 {
+  margin: 0 0 0.4rem;
+  color: #00213b;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
-.infra-sistemas__legend .esri-legend__service-label {
-  display: none !important;
+.infra-sistemas__legend ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.infra-sistemas__legend li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.18rem 0;
+}
+
+.infra-sistemas__legend-swatch {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+}
+
+.infra-sistemas__legend-swatch img,
+.infra-sistemas__legend-swatch svg,
+.infra-sistemas__legend-swatch canvas {
+  max-width: 16px;
+  max-height: 16px;
+}
+
+.infra-sistemas__legend-swatch .infra-map-legend__fallback {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px rgba(0, 33, 59, 0.2);
+}
+
+.infra-sistemas__legend li span:nth-child(2) {
+  color: #244354;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.infra-sistemas__legend li small {
+  color: #0a5c66;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.66rem;
+  font-weight: 600;
+}
+
+.infra-sistemas__legend-empty {
+  margin: 0;
+  color: #5d7380;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .infra-sistemas__overlay {

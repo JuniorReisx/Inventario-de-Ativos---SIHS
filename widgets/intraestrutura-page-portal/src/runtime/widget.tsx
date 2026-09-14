@@ -30,6 +30,7 @@ import { applyInfraGeometryFilter, applyInfraLayerScope, emptyCharts, groupSmall
 import {
   ASSET_DEFS,
   ASSET_PAGE_SIZE,
+  applyAssetZoomSymbology,
   ativoWhere,
   searchAtivos,
   listAtivosRelatorio,
@@ -461,6 +462,7 @@ const Widget = (props: AllWidgetProps<any>) => {
         }
         viewRef.current = view
         initialExtentRef.current = view.extent?.clone?.() || view.extent || null
+        await applyAssetZoomSymbology(webMap)
         window.setTimeout(() => {
           if (!viewRef.current) return
           initialExtentRef.current = viewRef.current.extent?.clone?.() || viewRef.current.extent || initialExtentRef.current
@@ -1017,6 +1019,8 @@ const Widget = (props: AllWidgetProps<any>) => {
     pinnedAtivoRef.current = item
     setSelectedAtivoKey(item.key)
     setSelectedSetorKey(null)
+    selectedSetorKeyRef.current = null
+    pinnedSetorRef.current = null
     setListTab('ativos')
     setPage(0)
     setAtivos((prev) => withPinnedAtivo(prev, item))
@@ -1118,7 +1122,7 @@ const Widget = (props: AllWidgetProps<any>) => {
     const webMap = webMapRef.current
     if (!view || !webMap) return
 
-    if (selectedSetorKeyRef.current === item.key) {
+    if (selectedSetorKeyRef.current === item.key && !selectedAtivoKeyRef.current) {
       await deselectAtivoKeepScope()
       return
     }
@@ -1128,6 +1132,7 @@ const Widget = (props: AllWidgetProps<any>) => {
     setSelectedSetorKey(item.key)
     setSelectedAtivoKey(null)
     selectedAtivoKeyRef.current = null
+    pinnedAtivoRef.current = null
     setListTab('setores')
     setPage(0)
     setSetores((prev) => withPinnedSetor(prev, item))
@@ -1186,7 +1191,7 @@ const Widget = (props: AllWidgetProps<any>) => {
   }, [deselectAtivoKeepScope, closeMunPopup])
 
   selectSetorFromMapRef.current = (item: SetorItem) => {
-    if (selectedSetorKeyRef.current === item.key) {
+    if (selectedSetorKeyRef.current === item.key && !selectedAtivoKeyRef.current) {
       void deselectAtivoKeepScope()
       return
     }

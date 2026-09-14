@@ -47,6 +47,19 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     return fmt1(pct) + '%';
   }
 
+  function formatCodigo(value){
+    const raw = String(value ?? '').trim();
+    if(!raw || raw === '—') return '—';
+    const sci = raw.replace(/\s/g, '').replace(',', '.');
+    if(/e[+-]?\d+/i.test(sci) || typeof value === 'number'){
+      const n = typeof value === 'number' ? value : Number(sci);
+      if(Number.isFinite(n)){
+        return Math.round(n).toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 0 });
+      }
+    }
+    return raw;
+  }
+
   function isEmbasaServed (value) {
     if (value == null || value === '') return false
     if (typeof value === 'boolean') return value
@@ -226,10 +239,13 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     </button>`;
   }
   
-  function setPanelHeader(selector, title, tip){
+  function setPanelHeader(selector, title, tip, kicker){
     const header = qs(selector);
     if(!header) return;
-    header.innerHTML = `<span class="panel-title-text">${title}</span>${infoTip(tip)}`;
+    const kickerHtml = kicker
+      ? `<span class="panel-kicker">${kicker}</span>`
+      : '';
+    header.innerHTML = `<span class="panel-title-stack">${kickerHtml}<span class="panel-title-text">${title}</span></span>${infoTip(tip)}`;
   }
   
   /** Território de Identidade da seleção atual (útil p/ município → comparar com o TI). */
@@ -305,7 +321,8 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     const cards = cats.map((c,i)=>{
       const val = v[c.key]||0;
       const pct = cl.total ? val/cl.total*100 : 0;
-      const light = String(colors[i]||'').toUpperCase() === String(lightColor||'').toUpperCase();
+      const color = colors[i];
+      const light = String(color||'').toUpperCase() === String(lightColor||'').toUpperCase();
       const fillExtra = light ? `;box-shadow:inset 0 0 0 1px ${lightBorder}` : '';
       const tiVal = showTi ? (terr.v[c.key]||0) : 0;
       const baVal = bahiaV?.[c.key]||0;
@@ -317,28 +334,30 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
         showTi ? `Peso no território (${tiLabel}): ${fmt(val)} ÷ ${fmt(tiVal)} = ${fmtShare(tiShare)}.` : '',
         showBa ? `Peso na Bahia: ${fmt(val)} ÷ ${fmt(baVal)} = ${fmtShare(baShare)}.` : ''
       ].filter(Boolean).join('<br>');
-      return `<article class="comp-card">
+      return `<article class="comp-card" style="--card-accent:${color}">
         <div class="comp-card-head">
-          <span class="comp-card-dot" style="background:${colors[i]}" aria-hidden="true"></span>
+          <span class="comp-card-swatch" aria-hidden="true"></span>
           <span class="comp-card-label" title="${c.label}">${c.label}</span>
           ${infoTip(why)}
         </div>
-        <div class="comp-card-value" title="${fmt(val)} domicílios (${fmt1(pct)}%)">
-          <strong>${fmt(val)}</strong>
-          <em>(${fmt1(pct)}%)</em>
+        <div class="comp-card-metrics">
+          <p class="comp-card-pct" title="${fmt(val)} domicílios (${fmt1(pct)}%)">${fmt1(pct)}<small>%</small></p>
+          <p class="comp-card-count"><strong>${fmt(val)}</strong><span>domicílios</span></p>
         </div>
         ${(showTi || showBa) ? `<div class="comp-card-refs">
           ${showTi ? `<span><b>${fmtShare(tiShare)}</b> território</span>` : ''}
           ${showBa ? `<span><b>${fmtShare(baShare)}</b> Bahia</span>` : ''}
         </div>` : ''}
         <div class="comp-card-bar" aria-hidden="true">
-          <span style="width:${Math.min(100, pct)}%;background:${colors[i]}${fillExtra}"></span>
+          <span style="width:${Math.min(100, pct)}%;background:${color}${fillExtra}"></span>
         </div>
       </article>`;
     }).join('');
 
-    return `<div class="comp-cards">${cards}</div>
-      <div class="comp-legend end">${infoTip(tip)}</div>`;
+    return `<div class="comp-stage">
+      <div class="comp-cards">${cards}</div>
+      <div class="comp-legend end">${infoTip(tip)}</div>
+    </div>`;
   }
   
   // ---------------- controles ----------------
@@ -909,23 +928,23 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
           <p class="ligacao-group__share">${fmt1(pctCom)}% dos domicílios ocupados</p>
         </header>
         <p class="ligacao-group__caption">Desses, a forma principal de abastecimento é:</p>
-        <div class="ligacao-split" aria-hidden="true">
-          <span style="width:${Math.max(2, pctUsaLig)}%"></span>
-          <span style="width:${Math.max(2, pctOutraLig)}%"></span>
-        </div>
         <div class="ligacao-group__parts">
-          <div class="ligacao-part ligacao-part--rede">
+          <div class="ligacao-part ligacao-part--rede ${pctUsaLig >= pctOutraLig ? 'is-major' : 'is-minor'}">
             ${infoTip('Domicílios cuja forma principal de abastecimento é a rede geral de distribuição (SIDRA / Censo 2022).')}
             <p class="ligacao-part__name">Usa a rede como forma principal</p>
             <p class="ligacao-part__value">${fmt(v.aa_rede)}</p>
             <p class="ligacao-part__share">${fmt1(pctUsaLig)}% de quem tem ligação</p>
           </div>
-          <div class="ligacao-part ligacao-part--outra">
+          <div class="ligacao-part ligacao-part--outra ${pctOutraLig > pctUsaLig ? 'is-major' : 'is-minor'}">
             ${infoTip('Domicílios com ligação à rede geral que declaram outra forma como principal: quem possui ligação menos quem usa a rede como forma principal.')}
             <p class="ligacao-part__name">Tem ligação, mas usa outra forma</p>
             <p class="ligacao-part__value">${fmt(outraForma)}</p>
             <p class="ligacao-part__share">${fmt1(pctOutraLig)}% de quem tem ligação</p>
           </div>
+        </div>
+        <div class="ligacao-split" aria-hidden="true">
+          <span class="ligacao-split__rede ${pctUsaLig >= pctOutraLig ? 'is-major' : 'is-minor'}" style="width:${Math.max(2, pctUsaLig)}%"></span>
+          <span class="ligacao-split__outra ${pctOutraLig > pctUsaLig ? 'is-major' : 'is-minor'}" style="width:${Math.max(2, pctOutraLig)}%"></span>
         </div>
       </article>
       <article class="ligacao-peer">
@@ -939,7 +958,8 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     const colors = categoryColors(AA_COMP_CATS);
     const compTitle = 'Formas de abastecimento';
     setPanelHeader('#view-agua .area-comp .panel-header', compTitle,
-      'Cada card mostra a quantidade de domicílios e a % na seleção. Quando há município ou recorte, também aparece o peso no território e na Bahia.');
+      'Cada card mostra a participação da forma na seleção. Quando há município ou recorte, também aparece o peso no território e na Bahia.',
+      'Indicador principal');
 
     const compChart = qs('#'+'compChart-agua');
     if (compChart) compChart.innerHTML = renderCompChart({
@@ -1051,27 +1071,119 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
   }
   
   let setoresModalSeq = 0;
+  let setoresModalAll = [];
+  let setoresModalPlace = '';
 
-  function fillSetoresModalRows(rows, nm){
+  function normalizeSearch(value){
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  }
+
+  function resetSetoresFilters(){
+    const tipo = qs('#'+'aglomeradosTipoFilter');
+    const search = qs('#'+'aglomeradosSearch');
+    if(tipo) tipo.value = '';
+    if(search) search.value = '';
+  }
+
+  function fillSetoresTipoOptions(rows){
+    const sel = qs('#'+'aglomeradosTipoFilter');
+    if(!sel) return;
+    const previous = sel.value;
+    const tipos = [...new Set((rows || []).map((row) => String(row.tipo || '').trim()).filter((tipo) => tipo && tipo !== '—'))]
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    sel.innerHTML = '';
+    const all = document.createElement('option');
+    all.value = '';
+    all.textContent = 'Todos os tipos';
+    sel.appendChild(all);
+    tipos.forEach((tipo) => {
+      const option = document.createElement('option');
+      option.value = tipo;
+      option.textContent = tipo;
+      sel.appendChild(option);
+    });
+    if(tipos.includes(previous)) sel.value = previous;
+  }
+
+  function renderSetoresModalRows(rows, nm, total){
     const tbody = qs('#'+'aglomeradosTbody');
     const empty = qs('#'+'aglomeradosEmpty');
     const table = qs('#'+'aglomeradosTable');
     const title = qs('#'+'aglomeradosTitle');
     const qtd = rows.length;
-    if(title) title.textContent = `Setores censitários — ${nm} · ${fmt(qtd)} ${qtd === 1 ? 'setor' : 'setores'}`;
-    if(tbody) tbody.innerHTML = rows.map(r => `
-      <tr>
-        <td>${r.codigo || '—'}</td>
-        <td>${r.situacao || '—'}</td>
+    const totalAll = Number(total) > 0 ? Number(total) : qtd;
+    if(title){
+      const countLabel = qtd === totalAll
+        ? `${fmt(qtd)} ${qtd === 1 ? 'setor' : 'setores'}`
+        : `${fmt(qtd)} de ${fmt(totalAll)}`;
+      title.textContent = `Setores censitários — ${nm} · ${countLabel}`;
+    }
+    if(tbody) tbody.innerHTML = rows.map(r => {
+      const codigo = String(r.codigo || '').replace(/"/g, '&quot;');
+      const oid = Number(r.oid) > 0 ? String(Math.round(Number(r.oid))) : '';
+      const tipo = String(r.tipo || '—').replace(/</g, '&lt;');
+      const nome = String(r.nome || '—').replace(/</g, '&lt;');
+      const situacao = String(r.situacao || '—').replace(/</g, '&lt;');
+      const codAglom = formatCodigo(r.codAglom || r.codigo).replace(/</g, '&lt;');
+      return `
+      <tr class="aglomerado-row" data-codigo="${codigo}" data-oid="${oid}" tabindex="0" role="button" title="Selecionar no mapa">
+        <td class="cod-aglom">${codAglom}</td>
+        <td>${nome}</td>
+        <td>${tipo}</td>
+        <td>${situacao}</td>
         <td class="num">${fmt(r.populacao)}</td>
         <td class="num">${fmt(r.domicilios)}</td>
-      </tr>
-    `).join('');
+      </tr>`;
+    }).join('');
     const has = qtd > 0;
     if(table) table.style.display = has ? '' : 'none';
     if(empty){
       empty.style.display = has ? 'none' : '';
-      empty.textContent = 'Nenhum setor censitário encontrado para este município.';
+      empty.textContent = totalAll === 0
+        ? 'Nenhum setor censitário encontrado para este município.'
+        : 'Nenhum setor corresponde ao filtro ou à pesquisa.';
+    }
+  }
+
+  function applySetoresModalFilter(){
+    const tipo = qs('#'+'aglomeradosTipoFilter')?.value || '';
+    const query = normalizeSearch(qs('#'+'aglomeradosSearch')?.value);
+    const queryDigits = query.replace(/\D/g, '');
+    const filtered = setoresModalAll.filter((row) => {
+      if(tipo && String(row.tipo || '') !== tipo) return false;
+      if(!query) return true;
+      const nome = normalizeSearch(row.nome);
+      const codigo = normalizeSearch(formatCodigo(row.codAglom || row.codigo));
+      const codigoRaw = normalizeSearch(row.codigo);
+      const digits = String(row.codAglom || row.codigo || '').replace(/\D/g, '');
+      if(nome.includes(query) || codigo.includes(query) || codigoRaw.includes(query)) return true;
+      if(queryDigits && digits.includes(queryDigits)) return true;
+      return false;
+    });
+    renderSetoresModalRows(filtered, setoresModalPlace, setoresModalAll.length);
+  }
+
+  function fillSetoresModalRows(rows, nm){
+    setoresModalAll = Array.isArray(rows) ? rows : [];
+    setoresModalPlace = nm;
+    fillSetoresTipoOptions(setoresModalAll);
+    applySetoresModalFilter();
+  }
+
+  function selectAglomeradoFromList(tr){
+    if(!tr) return;
+    const tbody = qs('#'+'aglomeradosTbody');
+    tbody?.querySelectorAll('tr.is-selected').forEach((el) => el.classList.remove('is-selected'));
+    tr.classList.add('is-selected');
+    const codigo = tr.getAttribute('data-codigo');
+    const oid = Number(tr.getAttribute('data-oid') || 0);
+    if((!codigo || codigo === '—') && !(oid > 0)) return;
+    if(useWebMap && typeof mapApi.selectSetorByCodigo === 'function'){
+      void mapApi.selectSetorByCodigo(codigo, oid);
     }
   }
 
@@ -1091,9 +1203,11 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     const table = qs('#'+'aglomeradosTable');
     const title = qs('#'+'aglomeradosTitle');
     if(title) title.textContent = `Setores censitários — ${nm}`;
-    if(tbody) tbody.innerHTML = `<tr><td colspan="4">Carregando setores censitários…</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="6">Carregando setores censitários…</td></tr>`;
     if(table) table.style.display = '';
     if(empty) empty.style.display = 'none';
+    resetSetoresFilters();
+    setoresModalAll = [];
     modal.hidden = false;
     if(btn) btn.setAttribute('aria-expanded', 'true');
     requestAnimationFrame(()=> modal.classList.add('is-open'));
@@ -1301,6 +1415,20 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
   qs('#'+'btnAglomerados')?.addEventListener('click', openAglomeradosModal);
   qs('#'+'btnExportPdf')?.addEventListener('click', () => { void exportRelatorioPdf(); });
   qs('#'+'aglomeradosClose')?.addEventListener('click', closeAglomeradosModal);
+  qs('#'+'aglomeradosTipoFilter')?.addEventListener('change', applySetoresModalFilter);
+  qs('#'+'aglomeradosSearch')?.addEventListener('input', applySetoresModalFilter);
+  root.addEventListener('click', (event) => {
+    const tr = event.target?.closest?.('#aglomeradosTbody tr[data-codigo], #aglomeradosModal tr.aglomerado-row');
+    if(!tr || !root.contains(tr)) return;
+    selectAglomeradoFromList(tr);
+  });
+  root.addEventListener('keydown', (event) => {
+    if(event.key !== 'Enter' && event.key !== ' ') return;
+    const tr = event.target?.closest?.('#aglomeradosTbody tr[data-codigo], #aglomeradosModal tr.aglomerado-row');
+    if(!tr || !root.contains(tr)) return;
+    event.preventDefault();
+    selectAglomeradoFromList(tr);
+  });
   renderControls();
   updateMuniSelectionUI();
   populateMuniList();

@@ -363,3 +363,54 @@ export async function listAtivosRelatorio (
     }
   }
 }
+
+const ASSET_SCALE_SIZE_STOPS = [
+  { value: 4000, size: 30 },
+  { value: 12000, size: 22 },
+  { value: 40000, size: 16 },
+  { value: 120000, size: 12 },
+  { value: 400000, size: 9 },
+  { value: 1500000, size: 6 },
+  { value: 5000000, size: 4 }
+]
+
+function isPointAssetLayer (layer: any): boolean {
+  const geometry = String(layer?.geometryType || '').toLowerCase()
+  if (geometry === 'point' || geometry === 'multipoint') return true
+  if (geometry === 'polygon' || geometry === 'polyline' || geometry === 'mesh') return false
+  const symbolType = String(
+    layer?.renderer?.symbol?.type
+    || layer?.renderer?.uniqueValueInfos?.[0]?.symbol?.type
+    || layer?.renderer?.classBreakInfos?.[0]?.symbol?.type
+    || ''
+  ).toLowerCase()
+  return symbolType.includes('marker') || symbolType.includes('picture')
+}
+
+export async function applyAssetZoomSymbology (webMap: any): Promise<void> {
+  await Promise.all(ASSET_DEFS.map(async (def) => {
+    const layer = findLayer(webMap, { layerTitle: def.layerTitle })
+    if (!layer) return
+    try {
+      await layer.load?.()
+      if (!isPointAssetLayer(layer) || !layer.renderer) return
+      const renderer = layer.renderer.clone?.() || layer.renderer
+      const kept = (renderer.visualVariables || []).filter((variable: any) => {
+        if (String(variable?.type || '').toLowerCase() !== 'size') return true
+        return String(variable?.valueExpression || '') !== '$view.scale'
+      })
+      renderer.visualVariables = [
+        ...kept,
+        {
+          type: 'size',
+          valueExpression: '$view.scale',
+          stops: ASSET_SCALE_SIZE_STOPS
+        }
+      ]
+      layer.renderer = renderer
+    } catch (err) {
+      console.error(`[infra-page] Falha ao ajustar simbologia de ${def.title}:`, err)
+    }
+  }))
+}
+

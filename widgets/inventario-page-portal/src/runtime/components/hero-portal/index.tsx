@@ -278,7 +278,7 @@ const HeroPortal = () => {
           <h1 className="hero-portal__title">Inventário de Infraestrutura Hídrica e Saneamento</h1>
           <span className="hero-portal__accent" aria-hidden="true" />
           <p className="hero-portal__subtitle">
-            Portal da Água · SIHS/BA
+            Portal da Água
           </p>
           <p className="hero-portal__text">
             Consulte e explore informações sobre reservatórios,

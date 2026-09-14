@@ -1,5 +1,4 @@
 import { React } from 'jimu-core'
-import { loadArcGISJSAPIModules } from 'jimu-arcgis'
 import {
   buildMunicipioPopupData,
   createMapView,
@@ -26,11 +25,11 @@ import {
   resolveActiveSistemasLayer,
   searchMunicipiosSistemas,
   selectExclusiveSistemasLayer,
-  sistemasLegendLayerInfos,
   type ClassMapConfig,
   type MunicipioSistema,
   type SistemaLayerItem
 } from '../../lib/sistemas'
+import { loadLayerLegendInView, type AssetLegendGroup } from '../../lib/legend'
 import PortalLoader from '../portal-loader'
 import './style.css'
 
@@ -50,10 +49,8 @@ function ClassMapPanel (props: {
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<HTMLDivElement>(null)
-  const legendRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<any>(null)
   const webMapRef = useRef<any>(null)
-  const legendWidgetRef = useRef<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [layers, setLayers] = useState<SistemaLayerItem[]>([])
@@ -69,6 +66,8 @@ function ClassMapPanel (props: {
   const munPopupRef = useRef<HTMLDivElement>(null)
   const rankRef = useRef<HTMLElement>(null)
   const [legendOpen, setLegendOpen] = useState(false)
+  const [legendBusy, setLegendBusy] = useState(false)
+  const [legendGroup, setLegendGroup] = useState<AssetLegendGroup | null>(null)
   const [munPopup, setMunPopup] = useState<{
     open: boolean
     data: MunicipioPopupData | null
@@ -243,16 +242,6 @@ function ClassMapPanel (props: {
         const listed = listSistemasLayers(webMap, props.config.allowedLayerKeys)
         setLayers(listed)
 
-        if (legendRef.current) {
-          const [Legend] = await loadArcGISJSAPIModules(['esri/widgets/Legend'])
-          if (cancelled) return
-          legendWidgetRef.current = new Legend({
-            view,
-            container: legendRef.current,
-            layerInfos: sistemasLegendLayerInfos(webMap, props.config.allowedLayerKeys)
-          })
-        }
-
         rankingLayerIdRef.current = initialLayerId
         setRankingLayerId(initialLayerId)
         const top = await loadTopMunicipiosSistemas(webMap, 10, props.config, initialLayerId)
@@ -275,8 +264,6 @@ function ClassMapPanel (props: {
       cancelled = true
       munPopupHandleRef.current?.remove?.()
       munPopupHandleRef.current = null
-      legendWidgetRef.current?.destroy?.()
-      legendWidgetRef.current = null
       viewRef.current?.destroy?.()
       viewRef.current = null
       webMapRef.current = null
@@ -329,6 +316,45 @@ function ClassMapPanel (props: {
       document.removeEventListener('click', onDocClick)
     }
   }, [munPopup.open, closeMunPopup])
+
+  useEffect(() => {
+    if (!props.active || !legendOpen) return
+    const view = viewRef.current
+    const webMap = webMapRef.current
+    if (!view || !webMap) return
+
+    let cancelled = false
+    const run = async () => {
+      const layer = resolveActiveSistemasLayer(
+        webMap,
+        rankingLayerIdRef.current,
+        props.config.allowedLayerKeys
+      )
+      if (!layer) {
+        if (!cancelled) setLegendGroup(null)
+        return
+      }
+      if (!cancelled) setLegendBusy(true)
+      try {
+        const next = await loadLayerLegendInView(layer, view, { showCount: true })
+        if (!cancelled) setLegendGroup(next)
+      } catch (err) {
+        console.error(`[infra-${props.config.id}] Falha ao atualizar a legenda:`, err)
+        if (!cancelled) setLegendGroup(null)
+      } finally {
+        if (!cancelled) setLegendBusy(false)
+      }
+    }
+
+    void run()
+    const handle = view.watch?.('stationary', (ok: boolean) => {
+      if (ok) void run()
+    })
+    return () => {
+      cancelled = true
+      handle?.remove?.()
+    }
+  }, [props.active, props.config, legendOpen, rankingLayerId, loading])
 
   const selectLayer = (layer: SistemaLayerItem) => {
     if (layer.id === rankingLayerIdRef.current && layer.visible) return
@@ -491,7 +517,33 @@ function ClassMapPanel (props: {
               <span>Legenda</span>
               <em>{legendOpen ? '−' : '+'}</em>
             </button>
-            <div className="infra-sistemas__legend" ref={legendRef} hidden={!legendOpen} />
+            {legendOpen
+              ? (
+                <div className="infra-sistemas__legend">
+                  {legendBusy && !legendGroup
+                    ? <p className="infra-sistemas__legend-empty">Atualizando legenda…</p>
+                    : !legendGroup?.items?.length
+                      ? <p className="infra-sistemas__legend-empty">Nada visível neste recorte</p>
+                      : (
+                        <>
+                          <h4>{layerLabel(legendGroup.title)}</h4>
+                          <ul>
+                            {legendGroup.items.map((item) => (
+                              <li key={item.id}>
+                                <span
+                                  className="infra-sistemas__legend-swatch"
+                                  dangerouslySetInnerHTML={{ __html: item.preview }}
+                                />
+                                <span>{item.label}</span>
+                                <small>{item.count}</small>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                        )}
+                </div>
+                )
+              : null}
           </aside>
           {loading
             ? (

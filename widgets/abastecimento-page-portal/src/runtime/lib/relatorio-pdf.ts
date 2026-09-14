@@ -376,7 +376,8 @@ export async function captureMapView (view: any): Promise<string | null> {
     })
     const shot = await view.takeScreenshot({
       format: 'jpg',
-      quality: 88
+      quality: 92,
+      width: 1920
     })
     return shot?.dataUrl || null
   } catch (error) {
@@ -565,7 +566,7 @@ export async function downloadRelatorioPdf (input: RelatorioPdfInput): Promise<v
     try {
       const img = await loadImage(input.mapDataUrl)
       const boxW = CONTENT_W
-      const maxH = 520
+      const maxH = 980
       const imgRatio = img.width / Math.max(1, img.height)
       let drawW = boxW
       let drawH = boxW / imgRatio

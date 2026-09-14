@@ -58,9 +58,18 @@ async function previewOf (symbol: any): Promise<string> {
   return `<span class="infra-map-legend__fallback" style="background:rgba(${r},${g},${b},${a})"></span>`
 }
 
-async function countWhere (layer: any, where: string): Promise<number> {
+function applyGeometry (query: any, geometry: any): void {
+  if (!geometry) return
+  query.geometry = geometry.clone?.() || geometry
+  query.spatialRelationship = 'intersects'
+}
+
+async function countWhere (layer: any, where: string, geometry?: any): Promise<number> {
   if (typeof layer.queryFeatureCount !== 'function') return 0
-  const total = await layer.queryFeatureCount({ where })
+  const query = layer.createQuery?.() || { where }
+  query.where = where
+  applyGeometry(query, geometry)
+  const total = await layer.queryFeatureCount(query)
   return Number(total) || 0
 }
 
@@ -68,11 +77,13 @@ async function groupedCounts (
   layer: any,
   fields: string[],
   where: string,
-  delimiter: string
+  delimiter: string,
+  geometry?: any
 ): Promise<Map<string, number>> {
   const query = layer.createQuery()
   query.where = where
   query.returnGeometry = false
+  applyGeometry(query, geometry)
   query.groupByFieldsForStatistics = fields
   query.outStatistics = [
     {
@@ -94,11 +105,52 @@ async function groupedCounts (
   return counts
 }
 
+async function attributeRows (
+  layer: any,
+  fields: string[],
+  where: string,
+  geometry?: any
+): Promise<Record<string, any>[]> {
+  const query = layer.createQuery()
+  query.where = where
+  query.returnGeometry = false
+  query.outFields = Array.from(new Set(fields.filter(Boolean)))
+  applyGeometry(query, geometry)
+  query.num = 2000
+
+  const rows: Record<string, any>[] = []
+  let start = 0
+  for (let page = 0; page < 12; page += 1) {
+    query.start = start
+    const result = await layer.queryFeatures(query)
+    const features = result.features || []
+    for (const feature of features) rows.push(feature.attributes || {})
+    if (!features.length || !result.exceededTransferLimit) break
+    start += features.length
+  }
+  return rows
+}
+
+function classBreakIndex (infos: any[], value: number): number {
+  if (!Number.isFinite(value)) return -1
+  for (let i = 0; i < infos.length; i += 1) {
+    const min = Number(infos[i].minValue)
+    const max = Number(infos[i].maxValue)
+    const last = i === infos.length - 1
+    if (Number.isFinite(min) && value < min) continue
+    if (Number.isFinite(max) && last && value > max) continue
+    if (Number.isFinite(max) && !last && value >= max) continue
+    return i
+  }
+  return -1
+}
+
 async function itemsForLayer (
   layer: any,
   defId: string,
   title: string,
-  where: string
+  where: string,
+  geometry?: any
 ): Promise<AssetLegendItem[]> {
   const renderer = layer.renderer
   const type = renderer?.type
@@ -107,7 +159,27 @@ async function itemsForLayer (
     const fields = rendererFields(renderer)
     if (!fields.length) return []
     const delimiter = renderer.fieldDelimiter || ', '
-    const counts = await groupedCounts(layer, fields, where, delimiter)
+    let counts = new Map<string, number>()
+    if (geometry) {
+      const rows = await attributeRows(layer, fields, where, geometry)
+      for (const attrs of rows) {
+        const key = fields.map((field) => normalizeValue(attrs[field])).join(delimiter)
+        counts.set(key, (counts.get(key) || 0) + 1)
+      }
+    } else {
+      try {
+        counts = await groupedCounts(layer, fields, where, delimiter)
+      } catch {
+        counts = new Map()
+      }
+      if (!counts.size) {
+        const rows = await attributeRows(layer, fields, where)
+        for (const attrs of rows) {
+          const key = fields.map((field) => normalizeValue(attrs[field])).join(delimiter)
+          counts.set(key, (counts.get(key) || 0) + 1)
+        }
+      }
+    }
     const items: AssetLegendItem[] = []
     const matched = new Set<string>()
 
@@ -139,22 +211,40 @@ async function itemsForLayer (
   }
 
   if (type === 'class-breaks' && renderer.field) {
+    const infos = renderer.classBreakInfos || []
+    const counts = new Array(infos.length).fill(0)
+    let other = 0
+    const rows = await attributeRows(layer, [renderer.field], where, geometry)
+    for (const attrs of rows) {
+      const value = Number(attrs[renderer.field])
+      const index = classBreakIndex(infos, value)
+      if (index >= 0) counts[index] += 1
+      else other += 1
+    }
+
     const items: AssetLegendItem[] = []
-    for (const info of renderer.classBreakInfos || []) {
-      const classWhere = `(${where}) AND (${renderer.field} >= ${Number(info.minValue)} AND ${renderer.field} <= ${Number(info.maxValue)})`
-      const count = await countWhere(layer, classWhere)
-      if (!count) continue
+    for (let i = 0; i < infos.length; i += 1) {
+      if (!counts[i]) continue
+      const info = infos[i]
       items.push({
         id: `${defId}-${info.minValue}-${info.maxValue}`,
         label: info.label || `${info.minValue}–${info.maxValue}`,
         preview: await previewOf(info.symbol),
-        count
+        count: counts[i]
+      })
+    }
+    if (other) {
+      items.push({
+        id: `${defId}-outros`,
+        label: renderer.defaultLabel || 'Outros',
+        preview: await previewOf(renderer.defaultSymbol),
+        count: other
       })
     }
     return items
   }
 
-  const count = await countWhere(layer, where)
+  const count = await countWhere(layer, where, geometry)
   if (!count) return []
   return [{
     id: defId,
@@ -200,6 +290,28 @@ async function groupFromVisibleLayer (
   }
   return {
     id,
+    title,
+    items,
+    showCount: options?.showCount
+  }
+}
+
+export async function loadLayerLegendInView (
+  layer: any,
+  view: any,
+  options?: { showCount?: boolean }
+): Promise<AssetLegendGroup | null> {
+  if (!isVisibleOnMap(layer) || typeof layer.queryFeatures !== 'function') return null
+  await layer.load?.()
+  const geometry = view?.extent?.clone?.() || view?.extent || null
+  const where = layer.definitionExpression || '1=1'
+  const title = String(layer.title || 'Camada')
+  const items = await withoutDefinitionExpression(layer, () => (
+    itemsForLayer(layer, layer.id || title, title, where, geometry)
+  ))
+  if (!items.length) return null
+  return {
+    id: layer.id || title,
     title,
     items,
     showCount: options?.showCount
