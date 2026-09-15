@@ -269,6 +269,7 @@ const PainelEsgoto = ({ folderUrl }: { folderUrl: string }) => {
                       <span className="recorte-panel__kicker">Recorte atual</span>
                       <span className="muni-detail-title" id="muniDetailTitle">Estado da Bahia</span>
                     </div>
+                    <span id="recorteInfoTip" className="recorte-panel__tip"></span>
                     <button type="button" id="muniDetailClose" className="btn-clear-muni" title="Desselecionar município" hidden>Fechar</button>
                   </div>
                   <div className="panel-body recorte-panel__body" id="muniDetailBody"></div>
@@ -295,7 +296,7 @@ const PainelEsgoto = ({ folderUrl }: { folderUrl: string }) => {
               </div>
 
               <div className="panel area-setores">
-                <div className="panel-header">Urbano e rural — setores censitários</div>
+                <div className="panel-header">Distribuição urbano e rural — setores censitários</div>
                 <div className="panel-body" id="setoresChart-esgoto"></div>
               </div>
             </div>

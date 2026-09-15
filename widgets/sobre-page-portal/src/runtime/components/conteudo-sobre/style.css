@@ -13,36 +13,8 @@
   --accent: #0a7fa8;
   max-width: 1120px;
   margin: 0 auto;
-  padding: 0.35rem 1.15rem 2.4rem;
+  padding: 1.15rem 1.15rem 2.4rem;
   color: var(--ink-2);
-}
-
-.sobre-jump {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  margin: 1.1rem 0 1.6rem;
-}
-
-.sobre-jump a {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.38rem 0.78rem;
-  border-radius: 999px;
-  background: #fff;
-  border: 1px solid var(--line);
-  color: var(--ink);
-  font-size: 0.82rem;
-  font-weight: 650;
-  text-decoration: none;
-  letter-spacing: 0.01em;
-}
-
-.sobre-jump a:hover,
-.sobre-jump a:focus-visible {
-  border-color: var(--cyan);
-  color: var(--accent);
-  outline: none;
 }
 
 .sobre-kicker {
@@ -74,6 +46,19 @@
   color: var(--muted);
 }
 
+.sobre-ext {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.sobre-ext:hover,
+.sobre-ext:focus-visible {
+  color: var(--navy-2);
+  outline: none;
+}
+
 .sobre-pills {
   display: flex;
   flex-wrap: wrap;
@@ -100,40 +85,6 @@
   margin-bottom: 0.4rem;
 }
 
-.sobre-steps {
-  list-style: none;
-  margin: 1.35rem 0 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.sobre-steps li {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.85rem;
-  align-items: start;
-  padding: 1.05rem 1.1rem;
-  border-radius: 16px;
-  background: var(--card);
-  border: 1px solid var(--line);
-}
-
-.sobre-steps__n {
-  display: grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 999px;
-  background: var(--navy-2);
-  color: #fff;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.sobre-steps h3,
 .sobre-module h3,
 .sobre-read h3,
 .sobre-dev h3 {
@@ -143,7 +94,6 @@
   color: var(--ink);
 }
 
-.sobre-steps p,
 .sobre-module p,
 .sobre-read p,
 .sobre-dev p {
@@ -263,31 +213,30 @@
 .sobre-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 640px;
 }
 
 .sobre-table th,
 .sobre-table td {
-  padding: 0.85rem 1rem;
+  padding: 0.85rem 1.05rem;
   text-align: left;
-  vertical-align: top;
-  font-size: 0.92rem;
-  line-height: 1.45;
+  vertical-align: middle;
+  font-size: 0.95rem;
+  line-height: 1.4;
 }
 
 .sobre-table thead th {
   background: #002231;
   color: #fff;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .sobre-table tbody th {
-  width: 34%;
+  width: 32%;
   color: var(--ink);
-  font-weight: 700;
+  font-weight: 750;
   background: #f7fbfd;
   border-bottom: 1px solid var(--line);
 }
@@ -295,6 +244,29 @@
 .sobre-table tbody td {
   color: var(--muted);
   border-bottom: 1px solid var(--line);
+}
+
+.sobre-table tbody td:last-child {
+  width: 5.5rem;
+  text-align: right;
+}
+
+.sobre-table thead th:last-child {
+  text-align: right;
+}
+
+.sobre-year {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.2rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: #e8f6fb;
+  color: var(--accent);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .sobre-table tbody tr:last-child th,
@@ -318,11 +290,55 @@
   border: 1px solid var(--line);
 }
 
+.sobre-partners {
+  list-style: none;
+  margin: 1.35rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.sobre-partners li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.55rem;
+  min-width: 0;
+  padding: 1.2rem 1rem 1.15rem;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid var(--line);
+}
+
+.sobre-partners img {
+  display: block;
+  height: 52px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.sobre-partners strong {
+  margin: 0.35rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+.sobre-partners span {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
 @media (max-width: 860px) {
-  .sobre-steps,
   .sobre-modules,
   .sobre-reads,
-  .sobre-dev {
+  .sobre-dev,
+  .sobre-partners {
     grid-template-columns: 1fr;
   }
 

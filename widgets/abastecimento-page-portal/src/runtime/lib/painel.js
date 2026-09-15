@@ -116,8 +116,8 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     aa_poco_raso: '#4CA3DE', // Poço raso, freático ou cacimba
     aa_pipa:      '#78BFE8', // Carro-pipa
     aa_rio:       '#A3D4F0', // Rios, açudes, córregos e lagos
-    aa_outra:     '#C9E4F5', // Outra forma
-    aa_sem_rede:  '#EFF7FC', // Não possui ligação à rede geral
+    aa_outra:     '#6B9BB5', // Outra forma
+    aa_sem_rede:  '#3D7A96', // Não possui ligação à rede geral
   };
   function categoryColors(cats){
     return cats.map(c => AA_CAT_COLORS[c.key] || '#6b7c8a');
@@ -334,20 +334,34 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
         showTi ? `Peso no território (${tiLabel}): ${fmt(val)} ÷ ${fmt(tiVal)} = ${fmtShare(tiShare)}.` : '',
         showBa ? `Peso na Bahia: ${fmt(val)} ÷ ${fmt(baVal)} = ${fmtShare(baShare)}.` : ''
       ].filter(Boolean).join('<br>');
+      const localLbl = state.selectedMun ? 'Município' : 'Seleção';
+      const compare = (showTi || showBa)
+        ? `<div class="comp-card-compare">
+            <div class="comp-card-compare__item is-local">
+              <strong>${fmt1(pct)}%</strong>
+              <span>${localLbl}</span>
+            </div>
+            ${showTi ? `<div class="comp-card-compare__item">
+              <strong>${fmtShare(tiShare)}</strong>
+              <span>Território</span>
+            </div>` : ''}
+            ${showBa ? `<div class="comp-card-compare__item">
+              <strong>${fmtShare(baShare)}</strong>
+              <span>Bahia</span>
+            </div>` : ''}
+          </div>
+          <p class="comp-card-count"><strong>${fmt(val)}</strong><span>domicílios</span></p>`
+        : `<div class="comp-card-metrics">
+            <p class="comp-card-pct" title="${fmt(val)} domicílios (${fmt1(pct)}%)">${fmt1(pct)}<small>%</small></p>
+            <p class="comp-card-count"><strong>${fmt(val)}</strong><span>domicílios</span></p>
+          </div>`;
       return `<article class="comp-card" style="--card-accent:${color}">
         <div class="comp-card-head">
           <span class="comp-card-swatch" aria-hidden="true"></span>
           <span class="comp-card-label" title="${c.label}">${c.label}</span>
           ${infoTip(why)}
         </div>
-        <div class="comp-card-metrics">
-          <p class="comp-card-pct" title="${fmt(val)} domicílios (${fmt1(pct)}%)">${fmt1(pct)}<small>%</small></p>
-          <p class="comp-card-count"><strong>${fmt(val)}</strong><span>domicílios</span></p>
-        </div>
-        ${(showTi || showBa) ? `<div class="comp-card-refs">
-          ${showTi ? `<span><b>${fmtShare(tiShare)}</b> território</span>` : ''}
-          ${showBa ? `<span><b>${fmtShare(baShare)}</b> Bahia</span>` : ''}
-        </div>` : ''}
+        ${compare}
         <div class="comp-card-bar" aria-hidden="true">
           <span style="width:${Math.min(100, pct)}%;background:${color}${fillExtra}"></span>
         </div>
@@ -632,7 +646,6 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     {key:'aa_outra', label:'Outra forma (categoria do Censo)', good:false},
     {key:'aa_sem_rede', label:'Não possui ligação à rede geral', good:false},
   ];
-  // Camada de setores só tem v00111–v00117 (sem “Outra”). O residual NÃO é categoria do Censo.
   const AA_SETORES_CATS = [
     {key:'aa_rede', label:'Rede geral de distribuição', good:true},
     {key:'aa_poco_prof', label:'Poço profundo ou artesiano', good:true},
@@ -641,11 +654,12 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     {key:'aa_pipa', label:'Carro-pipa', good:false},
     {key:'aa_chuva', label:'Água de chuva armazenada', good:false},
     {key:'aa_rio', label:'Rios, açudes, córregos e lagos', good:false},
+    {key:'aa_outra', label:'Outra forma', good:false},
   ];
 
   function classifyAaSetores(v){
     const adequado = (v.aa_rede||0) + (v.aa_poco_prof||0) + (v.aa_poco_raso||0);
-    const inadequado = (v.aa_fonte||0) + (v.aa_pipa||0) + (v.aa_chuva||0) + (v.aa_rio||0);
+    const inadequado = (v.aa_fonte||0) + (v.aa_pipa||0) + (v.aa_chuva||0) + (v.aa_rio||0) + (v.aa_outra||0);
     const known = adequado + inadequado;
     const gap = Math.max(0, (v.aa_total||0) - known);
     return {
@@ -653,6 +667,14 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
       pctAdeq: known ? adequado/known*100 : 0,
       pctGap: (v.aa_total||0) ? gap/(v.aa_total||0)*100 : 0
     };
+  }
+
+  function fillSetoresOutra(v){
+    const known =
+      (v.aa_rede||0) + (v.aa_poco_prof||0) + (v.aa_poco_raso||0) +
+      (v.aa_fonte||0) + (v.aa_pipa||0) + (v.aa_chuva||0) + (v.aa_rio||0);
+    v.aa_outra = Math.max(0, (v.aa_total||0) - known);
+    return v;
   }
   
   function currentSetoresFeatures(){
@@ -695,7 +717,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     let paths = '';
     if (visible.length === 1) {
       paths = `<circle class="sihs-pie__slice" data-label="${escapeHtml(visible[0].label)}" data-value="${visible[0].value}" data-pct="100" cx="${cx}" cy="${cy}" r="${rOuter}" fill="${visible[0].color}"></circle>
-        <circle cx="${cx}" cy="${cy}" r="${rInner}" fill="#f4f8fb"></circle>`;
+        <circle class="sihs-pie__hole" cx="${cx}" cy="${cy}" r="${rInner}"></circle>`;
     } else {
       visible.forEach(s => {
         const pct = s.value / total * 100;
@@ -705,7 +727,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
         angle += sweep + gap;
         paths += `<path class="sihs-pie__slice" data-label="${escapeHtml(s.label)}" data-value="${s.value}" data-pct="${pct}" d="${donutSlicePath(cx, cy, rOuter, rInner, a0, a1 || a0 + Math.PI * 2 - 1e-4)}" fill="${s.color}"></path>`;
       });
-      paths = `<circle cx="${cx}" cy="${cy}" r="${rInner - 2}" fill="#f4f8fb"></circle>` + paths;
+      paths = `<circle class="sihs-pie__hole" cx="${cx}" cy="${cy}" r="${rInner - 1}"></circle>` + paths;
     }
 
     const legend = visible.map(s => {
@@ -714,9 +736,10 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
       return `<li data-label="${escapeHtml(s.label)}">
         <button type="button" class="sihs-pie__leg" data-label="${escapeHtml(s.label)}" data-value="${s.value}" data-pct="${pct}" title="${escapeHtml(name)}">
           <i style="background:${s.color}"></i>
-          <span>${escapeHtml(name)}</span>
-          <b>${fmt(s.value)}</b>
-          <em>${fmt1(pct)}%</em>
+          <span class="sihs-pie__name">${escapeHtml(name)}</span>
+          <em class="sihs-pie__pct">${fmt1(pct)}%</em>
+          <span class="sihs-pie__bar" aria-hidden="true"><span style="width:${Math.min(100, pct)}%;background:${s.color}"></span></span>
+          <b class="sihs-pie__n">${fmt(s.value)}</b>
         </button>
       </li>`;
     }).join('');
@@ -782,52 +805,13 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
       short: shortFormLabel(c.label),
       value: agg[c.key]||0,
       color: colorMap[c.key] || '#8aa0ab'
-    })).filter(x=>x.value>0).sort((a,b)=>b.value-a.value);
-    const minPct = 1; // só fatias relevantes no gráfico
-    const slices = [];
-    let minor = 0;
-    const minorNames = [];
-    all.forEach(x=>{
-      const pct = total ? x.value/total*100 : 0;
-      if(pct >= minPct) slices.push(x);
-      else {
-        minor += x.value;
-        minorNames.push(x.label);
-      }
+    })).filter(x=>x.value>0).sort((a,b)=>{
+      const aOutra = a.key === 'aa_outra' || /^outra forma/i.test(a.label);
+      const bOutra = b.key === 'aa_outra' || /^outra forma/i.test(b.label);
+      if (aOutra !== bOutra) return aOutra ? 1 : -1;
+      return b.value - a.value;
     });
-    if(minor > 0){
-      slices.push({
-        key: '_demais',
-        label: 'Demais formas (<1% cada): ' + minorNames.join('; '),
-        short: 'Demais (<1% cada)',
-        value: minor,
-        color: '#9aafbc'
-      });
-    }
-    return { total, all, slices };
-  }
-
-  function splitReading(uPct, tot){
-    if(!tot) return 'Não há domicílios com forma declarada nesta seleção.';
-    if(uPct>=90) return 'Quase todos os domicílios desta seleção estão em área urbana.';
-    if(uPct>=75) return 'A maior parte dos domicílios está em área urbana.';
-    if(uPct>=55) return 'Há mais domicílios urbanos do que rurais nesta seleção.';
-    if(uPct>=45) return 'Domicílios urbanos e rurais estão em proporção semelhante.';
-    if(uPct>=25) return 'Há mais domicílios rurais do que urbanos nesta seleção.';
-    if(uPct>=10) return 'A maior parte dos domicílios está em área rural.';
-    return 'Quase todos os domicílios desta seleção estão em área rural.';
-  }
-
-  function formInsight(bundle, place, verb){
-    if(!bundle.slices.length || !bundle.total) return `Não há domicílios com forma declarada em área ${place}.`;
-    const top = bundle.slices[0];
-    const pct = top.value/bundle.total*100;
-    return `Em área <b>${place}</b>, a forma mais comum é <b>${top.label || top.short}</b> (${fmt1(pct)}% ${verb}).`;
-  }
-
-  function setoresGapNote(cl, place){
-    if(!cl.gap) return '';
-    return `<p class="ur-gap"><b>${fmt(cl.gap)}</b> domicílios (${fmt1(cl.pctGap)}% do total ${place}) ficam fora destas formas: a camada de setores <b>não traz</b> a categoria “Outra” do Censo — por isso esse resto não entra no gráfico.</p>`;
+    return { total, all, slices: all };
   }
 
   function renderSetoresUrChart(cats, urbColor, rurColor){
@@ -850,14 +834,10 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     }
     const urbFeats = feats.filter(f=>f.properties.situacao==='Urbana');
     const rurFeats = feats.filter(f=>f.properties.situacao==='Rural');
-    const urb = sumAa(urbFeats);
-    const rur = sumAa(rurFeats);
+    const urb = fillSetoresOutra(sumAa(urbFeats));
+    const rur = fillSetoresOutra(sumAa(rurFeats));
     const urbTot = urb.aa_total||0;
     const rurTot = rur.aa_total||0;
-    const tot = urbTot + rurTot;
-    const uPct = tot ? urbTot/tot*100 : 0;
-    const urbCl = classifyAaSetores(urb);
-    const rurCl = classifyAaSetores(rur);
     const urbForms = formBundle(cats, urb, AA_CAT_COLORS);
     const rurForms = formBundle(cats, rur, AA_CAT_COLORS);
     const splitSlices = [
@@ -866,35 +846,27 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     ];
     slot.innerHTML = `
       <div class="ur-board">
-        <p class="ur-lead">Nos setores o IBGE publica só 7 formas (rede, poços, fonte, pipa, chuva e rios). O gráfico usa <b>só essas</b>. O detalhe “Outra forma” do Censo aparece nos cards de formas do município, não nesta camada.</p>
-        <section class="ur-panel ur-panel--split">
-          <header class="ur-panel__head">
-            <p class="ur-panel__eyebrow">Distribuição</p>
-            <h3 class="ur-panel__title">Urbano e rural</h3>
-          </header>
-          ${renderInfraPie(splitSlices, { id: 'split-agua', unit: 'domicílios', size: 200 })}
-          <p class="ur-read">${splitReading(uPct, tot)}</p>
-        </section>
-        <div class="ur-forms">
+        <div class="ur-row">
+          <section class="ur-panel ur-panel--split">
+            <header class="ur-panel__head">
+              <h3 class="ur-panel__title">Urbano e rural</h3>
+            </header>
+            ${renderInfraPie(splitSlices, { id: 'split-agua', unit: 'domicílios', size: 196, layout: 'stack' })}
+          </section>
           <section class="ur-panel ur-panel--form">
             <header class="ur-panel__head">
-              <p class="ur-panel__eyebrow">Área urbana · ${fmt1(urbCl.pctAdeq)}% adequado entre as formas detalhadas</p>
-              <h3 class="ur-panel__title">Como se abastecem</h3>
-              <p class="ur-insight">${formInsight(urbForms, 'urbana', 'das formas detalhadas')}</p>
+              <h3 class="ur-panel__title">Área urbana</h3>
             </header>
-            ${renderInfraPie(urbForms.slices, { id: 'urb-agua', unit: 'domicílios', size: 168, layout: 'stack' })}
-            ${setoresGapNote(urbCl, 'urbano')}
+            ${renderInfraPie(urbForms.slices, { id: 'urb-agua', unit: 'domicílios', size: 196, layout: 'stack' })}
           </section>
           <section class="ur-panel ur-panel--form ur-panel--rur">
             <header class="ur-panel__head">
-              <p class="ur-panel__eyebrow">Área rural · ${fmt1(rurCl.pctAdeq)}% adequado entre as formas detalhadas</p>
-              <h3 class="ur-panel__title">Como se abastecem</h3>
-              <p class="ur-insight">${formInsight(rurForms, 'rural', 'das formas detalhadas')}</p>
+              <h3 class="ur-panel__title">Área rural</h3>
             </header>
-            ${renderInfraPie(rurForms.slices, { id: 'rur-agua', unit: 'domicílios', size: 168, layout: 'stack' })}
-            ${setoresGapNote(rurCl, 'rural')}
+            ${renderInfraPie(rurForms.slices, { id: 'rur-agua', unit: 'domicílios', size: 196, layout: 'stack' })}
           </section>
         </div>
+        <p class="ur-lead">Nos setores o IBGE publica 7 formas (rede, poços, fonte, pipa, chuva e rios). O restante dos domicílios entra no gráfico como <b>Outra forma</b>.</p>
       </div>`;
     bindPieInteractions(slot);
   }
@@ -969,7 +941,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     });
 
     setPanelHeader('#view-agua .area-setores .panel-header',
-      'Urbano e rural — setores censitários · ' + currentSelectionLabel(),
+      'Distribuição urbano e rural — setores censitários · ' + currentSelectionLabel(),
       'Composição urbana e rural a partir da menor unidade do Censo (setor censitário). Campo Situação do Setor Censitário. Acompanha o recorte do mapa (território, semiárido ou município) e não aparece no mapa.');
     renderSetoresUrChart(AA_SETORES_CATS, '#1B5FA0', '#8EC8EE');
   }
@@ -986,19 +958,18 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     const v = sumAa(feats);
     const pop = feats.reduce((s,f)=>s+(f.properties.populacao||0),0);
     const kickerEl = panel.querySelector('.recorte-panel__kicker');
+    const tipSlot = qs('#'+'recorteInfoTip');
     const statsHtml = `
       <div class="recorte-stats">
         <div class="recorte-stat">
           <span class="recorte-stat__label">
             <span class="recorte-stat__name">Municípios</span>
-            ${infoTip('Quantidade de municípios incluídos no recorte atual.')}
           </span>
           <strong class="recorte-stat__value">${fmt(feats.length)}</strong>
         </div>
         <div class="recorte-stat">
           <span class="recorte-stat__label">
             <span class="recorte-stat__name">População</span>
-            ${infoTip('Estimativa IBGE 2026 somada dos municípios do recorte.')}
             <span class="recorte-stat__hint">2026</span>
           </span>
           <strong class="recorte-stat__value">${fmt(pop)}</strong>
@@ -1006,7 +977,6 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
         <div class="recorte-stat">
           <span class="recorte-stat__label">
             <span class="recorte-stat__name">Domicílios ocupados</span>
-            ${infoTip('SIDRA 6803: soma de quem possui ligação à rede geral e de quem não possui.')}
             <span class="recorte-stat__hint">SIDRA</span>
           </span>
           <strong class="recorte-stat__value">${fmt(totalDomicilios(v))}</strong>
@@ -1016,6 +986,11 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
 
     if(kickerEl) kickerEl.textContent = currentScopeKicker();
     if(titleEl) titleEl.textContent = currentScopeTitle();
+    if(tipSlot) tipSlot.innerHTML = infoTip(
+      `<span class="info-tip-item"><strong>Municípios</strong> Quantidade de municípios incluídos no recorte atual (estado, território, semiárido ou município).</span>` +
+      `<span class="info-tip-item"><strong>População</strong> Estimativa IBGE 2026 somada dos municípios do recorte.</span>` +
+      `<span class="info-tip-item"><strong>Domicílios ocupados</strong> SIDRA 6803: soma de quem possui ligação à rede geral e de quem não possui.</span>`
+    );
 
     if(state.selectedMun){
       const f = GEO.features.find(x=>x.properties.cod_mun===state.selectedMun);
@@ -1301,8 +1276,8 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
       const setorFeats = currentSetoresFeatures();
       const urbFeats = setorFeats.filter(f=>f.properties.situacao==='Urbana');
       const rurFeats = setorFeats.filter(f=>f.properties.situacao==='Rural');
-      const urb = sumAa(urbFeats);
-      const rur = sumAa(rurFeats);
+      const urb = fillSetoresOutra(sumAa(urbFeats));
+      const rur = fillSetoresOutra(sumAa(rurFeats));
       const urbTot = urb.aa_total||0;
       const rurTot = rur.aa_total||0;
       const setorTot = urbTot + rurTot;
@@ -1397,7 +1372,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
                 ['Possui ligação à rede geral e a utiliza como forma principal', 'SIDRA tabela 6803 · DPA Indicadores (aa_l_r_g)'],
                 ['Possui ligação à rede geral, mas utiliza principalmente outra forma', 'Calculado no painel: quem possui ligação (total − aa_npl_rg) menos quem usa a rede como forma principal (aa_l_r_g)'],
                 ['Domicílios urbanos e rurais', 'Censo IBGE 2022 · Setores Censitarios_BA (Situação do setor + v0002)'],
-                ['Formas no urbano e no rural', 'Censo IBGE 2022 · Setores censitários (v00111 a v00117). Não fecha com o total municipal da tabela 6803.'],
+                ['Formas no urbano e no rural', 'Censo IBGE 2022 · Setores censitários (v00111 a v00117). O restante entra como Outra forma.'],
                 ['Mapa da seleção', 'Web map de abastecimento · camada municipal DPA Indicadores']
               ]
             }
@@ -1473,7 +1448,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
   SETORES.__refresh = () => {
     try {
       setPanelHeader('#view-agua .area-setores .panel-header',
-        'Urbano e rural — setores censitários · ' + currentSelectionLabel(),
+        'Distribuição urbano e rural — setores censitários · ' + currentSelectionLabel(),
         'Composição urbana e rural a partir da menor unidade do Censo (setor censitário). Campo Situação do Setor Censitário. Acompanha o recorte do mapa (território, semiárido ou município) e não aparece no mapa.');
       renderSetoresUrChart(AA_SETORES_CATS, '#1B5FA0', '#8EC8EE');
     } catch (error) {

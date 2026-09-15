@@ -238,7 +238,7 @@ export async function loadSetoresUrbanoRural (
         nm_mun: geo?.nm_mun || row.nm_mun,
         territorio: geo?.territorio || '',
         semiarido: geo?.semiarido || 'NÃO',
-        aa_outra: 0, // camada sem campo “Outra”; residual não é categoria do Censo
+        aa_outra: Math.max(0, row.aa_total - known),
         aa_sem_rede: 0
       }
     }

@@ -3,14 +3,14 @@ import HeroSobre from './components/hero-sobre'
 import ConteudoSobre from './components/conteudo-sobre'
 import './style.css'
 
-const Widget = (_props: AllWidgetProps<any>) => {
+const Widget = (props: AllWidgetProps<any>) => {
   return (
     <div className="sobre-page jimu-widget">
       <div className="sobre-page__hero">
         <HeroSobre />
       </div>
       <div className="sobre-page__body">
-        <ConteudoSobre />
+        <ConteudoSobre folderUrl={props.context.folderUrl} />
       </div>
     </div>
   )
