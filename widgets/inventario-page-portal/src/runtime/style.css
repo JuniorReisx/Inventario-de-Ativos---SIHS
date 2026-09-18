@@ -794,6 +794,14 @@
   font-weight: 800;
   letter-spacing: 0.03em;
   color: var(--navy);
+  white-space: normal;
+  overflow: visible;
+  line-height: 1.2;
+}
+
+.panel-map .panel-title {
+  font-size: clamp(1.05rem, 4.4vw, 1.35rem);
+  letter-spacing: 0.02em;
 }
 
 .stats-panel-head {
@@ -940,6 +948,7 @@
 
 .panel-map {
   min-height: 0;
+  overflow: visible;
 }
 
 .panel-map .panel-head {
@@ -2004,7 +2013,7 @@
 
   .dashboard-main {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(280px, 42vh) auto;
+    grid-template-rows: minmax(480px, 62vh) auto;
     overflow: visible;
   }
 
@@ -2019,8 +2028,8 @@
 
 @media (max-width: 720px) {
   .dashboard {
-    padding: 0.55rem;
-    gap: 0.55rem;
+    padding: 0.45rem;
+    gap: 0.5rem;
   }
 
   .kpi-strip {
@@ -2043,6 +2052,47 @@
   .saneamento-card__badge {
     text-align: left;
   }
+
+  .dashboard-main {
+    grid-template-rows: minmax(560px, 78vh) auto;
+  }
+
+  .sihs-page .dashboard-main {
+    min-height: 0;
+  }
+
+  .panel-map {
+    overflow: visible;
+    min-height: 620px;
+  }
+
+  .panel-map .panel-head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .panel-map .panel-head > div {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .panel-title,
+  .panel-map .panel-title {
+    font-size: 1.22rem;
+    line-height: 1.25;
+    overflow: visible;
+    white-space: normal;
+  }
+
+  .sihs-page .panel-map .map-frame {
+    min-height: 520px;
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-strip {
+    grid-template-columns: 1fr;
+  }
 }
 
 
@@ -2063,6 +2113,16 @@
 
 .sihs-page .panel-map .map-frame {
   min-height: 480px;
+}
+
+@media (max-width: 720px) {
+  .sihs-page .dashboard-main {
+    min-height: 0;
+  }
+
+  .sihs-page .panel-map .map-frame {
+    min-height: 520px;
+  }
 }
 
 .sihs-dash .sihs-dash__map {

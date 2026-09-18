@@ -1283,7 +1283,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
       const setorTot = urbTot + rurTot;
       const uPct = setorTot ? urbTot/setorTot*100 : 0;
       const rPct = setorTot ? rurTot/setorTot*100 : 0;
-      const pctIn = (part, tot) => tot ? fmt1(part/tot*100)+'% da área' : '—';
+      const pctIn = (part, tot) => tot ? `${fmt(part)} (${fmt1(part / tot * 100)}%)` : '—';
       const mapDataUrl = mapApi && typeof mapApi.capture === 'function' ? await mapApi.capture(state) : null;
       const mapLegend = mapApi && typeof mapApi.captureLegend === 'function' ? await mapApi.captureLegend() : [];
       const formaBars = AA_COMP_CATS.map(c=>{
@@ -1346,10 +1346,10 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
           },
           {
             title: '2b. Como cada área se abastece (100% da área, não do município)',
-            note: 'Percentual dentro do urbano e dentro do rural. Ex.: 40% no urbano = 40% dos domicílios urbanos usam aquela forma — não 40% do município. Os totais oficiais continuam na seção 1.',
+            note: 'Quantidade de domicílios e percentual dentro do urbano e dentro do rural. Ex.: 40% no urbano = 40% dos domicílios urbanos usam aquela forma — não 40% do município. Os totais oficiais continuam na seção 1.',
             table: {
-              headers: ['Forma de abastecimento', 'No urbano', 'No rural'],
-              rows: AA_COMP_CATS.filter(c=>((urb[c.key]||0)+(rur[c.key]||0))>0).map(c=>[
+              headers: ['Forma de abastecimento', 'Área urbana', 'Área rural'],
+              rows: AA_SETORES_CATS.filter(c=>((urb[c.key]||0)+(rur[c.key]||0))>0).map(c=>[
                 c.label,
                 pctIn(urb[c.key]||0, urbTot),
                 pctIn(rur[c.key]||0, rurTot)

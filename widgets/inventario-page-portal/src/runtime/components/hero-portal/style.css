@@ -265,7 +265,7 @@
 
 @media (max-width: 640px) {
   .hero-portal__inner {
-    padding: 40px 22px;
+    padding: 28px 16px;
     max-width: 100%;
   }
 
@@ -273,6 +273,10 @@
     font-size: 0.62rem;
     letter-spacing: 0.08em;
     max-width: 100%;
+  }
+
+  .hero-portal__title {
+    font-size: clamp(1.6rem, 8vw, 2.2rem);
   }
 
   .hero-portal__subtitle {

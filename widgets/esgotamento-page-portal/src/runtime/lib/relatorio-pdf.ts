@@ -509,31 +509,37 @@ export async function downloadRelatorioPdf (input: RelatorioPdfInput): Promise<v
   ctx().fillText(input.source, PAD, 116)
   painter.y = 168
 
-  painter.ensure(132)
-  const kpiCount = Math.max(1, input.kpis.length)
-  const kpiW = (CONTENT_W - (kpiCount - 1) * 12) / kpiCount
-  input.kpis.forEach((kpi, index) => {
-    const x = PAD + index * (kpiW + 12)
-    ctx().fillStyle = colors.kpi
-    roundRect(ctx(), x, painter.y, kpiW, 124, 12)
-    ctx().fill()
-    ctx().strokeStyle = 'rgba(0,0,0,0.06)'
-    ctx().stroke()
-    ctx().fillStyle = colors.accent
-    ctx().font = '700 28px Segoe UI, Arial, sans-serif'
-    ctx().fillText(kpi.value, x + 14, painter.y + 46, kpiW - 28)
-    ctx().fillStyle = '#4f6470'
-    ctx().font = '15px Segoe UI, Arial, sans-serif'
-    wrapText(ctx(), kpi.label, kpiW - 28).slice(0, 2).forEach((line, lineIndex) => {
-      ctx().fillText(line, x + 14, painter.y + 72 + lineIndex * 19, kpiW - 28)
+  const kpis = input.kpis
+  const perRow = kpis.length > 4 ? 4 : Math.max(1, kpis.length)
+  const kpiGap = 12
+  const kpiH = 128
+  for (let start = 0; start < kpis.length; start += perRow) {
+    const row = kpis.slice(start, start + perRow)
+    painter.ensure(kpiH + 12)
+    const kpiW = (CONTENT_W - (row.length - 1) * kpiGap) / row.length
+    row.forEach((kpi, index) => {
+      const x = PAD + index * (kpiW + kpiGap)
+      ctx().fillStyle = colors.kpi
+      roundRect(ctx(), x, painter.y, kpiW, kpiH, 12)
+      ctx().fill()
+      ctx().strokeStyle = 'rgba(0,0,0,0.06)'
+      ctx().stroke()
+      ctx().fillStyle = colors.accent
+      ctx().font = '700 26px Segoe UI, Arial, sans-serif'
+      ctx().fillText(kpi.value, x + 14, painter.y + 42, kpiW - 28)
+      ctx().fillStyle = '#4f6470'
+      ctx().font = '14px Segoe UI, Arial, sans-serif'
+      wrapText(ctx(), kpi.label, kpiW - 28).slice(0, 2).forEach((line, lineIndex) => {
+        ctx().fillText(line, x + 14, painter.y + 68 + lineIndex * 18, kpiW - 28)
+      })
+      if (kpi.sub) {
+        ctx().fillStyle = colors.header
+        ctx().font = '600 15px Segoe UI, Arial, sans-serif'
+        ctx().fillText(kpi.sub, x + 14, painter.y + 112, kpiW - 28)
+      }
     })
-    if (kpi.sub) {
-      ctx().fillStyle = colors.header
-      ctx().font = '600 15px Segoe UI, Arial, sans-serif'
-      ctx().fillText(kpi.sub, x + 14, painter.y + 110, kpiW - 28)
-    }
-  })
-  painter.y += 144
+    painter.y += kpiH + 14
+  }
 
   if (input.guide && input.guide.items.length) {
     ctx().font = '15px Segoe UI, Arial, sans-serif'

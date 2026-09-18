@@ -22,6 +22,7 @@
   -webkit-font-smoothing: antialiased;
   position: relative;
   z-index: 40;
+  overflow: visible;
 }
 
 .hp-header__bar {
@@ -304,17 +305,10 @@ a.hp-header__link {
   transform: translateY(-2px) rotate(-45deg);
 }
 
-.hp-header__mobile {
-  display: none;
-}
-
-/* Overlay fixo: o container do widget no ExB corta conteúdo que ultrapassa a altura */
 .hp-header__backdrop {
   display: block;
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   z-index: 9998;
   border: none;
   padding: 0;
@@ -323,45 +317,82 @@ a.hp-header__link {
   cursor: pointer;
 }
 
-.hp-header__mobile.is-open {
+.hp-header__drawer {
   display: flex;
   position: fixed;
-  left: 0;
+  top: 0;
   right: 0;
+  bottom: 0;
   z-index: 9999;
+  width: min(320px, 88vw);
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.9rem;
-  max-height: min(70vh, 420px);
+  gap: 0.35rem;
+  padding: 0.85rem 0.85rem 1.2rem;
   overflow-y: auto;
   background: linear-gradient(180deg, #001824 0%, #000d14 100%);
-  border-bottom: 1px solid rgba(26, 168, 200, 0.28);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+  border-left: 1px solid rgba(26, 168, 200, 0.28);
+  box-shadow: -18px 0 40px rgba(0, 0, 0, 0.45);
+  transform: translateX(100%);
+  transition: transform 0.22s ease;
 }
 
-.hp-header__mobile.is-open .hp-header__link {
+.hp-header__drawer.is-open {
+  transform: translateX(0);
+}
+
+.hp-header__drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+  padding: 0.2rem 0.25rem 0.7rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hp-header__drawer-head strong {
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hp-header__drawer-close {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hp-header__drawer .hp-header__link {
   width: 100%;
   height: auto;
   text-align: left;
-  border-radius: 10px;
-  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  padding: 0.95rem 1rem;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #fff;
+  white-space: normal;
 }
 
-.hp-header__mobile.is-open .hp-header__link:hover,
-.hp-header__mobile.is-open .hp-header__link:focus-visible {
+.hp-header__drawer .hp-header__link:hover,
+.hp-header__drawer .hp-header__link:focus-visible {
   background: rgba(26, 168, 200, 0.18);
 }
 
-.hp-header__mobile.is-open .hp-header__link.is-active {
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
+.hp-header__drawer .hp-header__link.is-active {
+  background: rgba(26, 168, 200, 0.22);
+  border-color: rgba(47, 196, 255, 0.45);
 }
 
-.hp-header__mobile.is-open .hp-header__link::after {
+.hp-header__drawer .hp-header__link::after {
   left: 1rem;
   right: auto;
   bottom: 10px;
@@ -384,36 +415,58 @@ a.hp-header__link {
 }
 
 @media (max-width: 640px) {
+  .hp-header {
+    min-height: 64px;
+  }
+
+  .hp-header__bar {
+    min-height: 64px;
+  }
+
   .hp-header__divider {
     display: none;
   }
 
   .hp-header__brand {
-    gap: 0.65rem;
-    padding: 0.45rem 0.65rem;
+    gap: 0.5rem;
+    padding: 0.35rem 0.5rem;
+    flex: 1;
+    min-width: 0;
   }
 
   .hp-header__portal {
-    height: 38px;
+    height: 32px;
   }
 
   .hp-header__brasao {
-    height: 34px;
+    height: 28px;
   }
 
   .hp-header__eyebrow {
-    font-size: 0.62rem;
+    font-size: 0.58rem;
   }
 
   .hp-header__title {
-    font-size: 0.82rem;
+    font-size: 0.74rem;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .hp-header__menu-btn {
+    width: 44px;
+    height: 44px;
+    margin-right: 0.5rem;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .hp-header__link,
   .hp-header__brand,
-  .hp-header__menu-btn {
+  .hp-header__menu-btn,
+  .hp-header__drawer {
     transition: none;
   }
 }

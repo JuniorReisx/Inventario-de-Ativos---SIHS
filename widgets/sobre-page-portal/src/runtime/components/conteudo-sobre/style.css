@@ -343,7 +343,51 @@
   }
 
   .sobre-body {
-    padding: 0.2rem 0.85rem 2rem;
+    padding: 0.75rem 0.85rem 2rem;
+  }
+
+  .sobre-intro h2,
+  .sobre-block__head h2 {
+    font-size: 1.45rem;
+  }
+
+  .sobre-table thead {
+    display: none;
+  }
+
+  .sobre-table,
+  .sobre-table tbody,
+  .sobre-table tr,
+  .sobre-table th,
+  .sobre-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .sobre-table tbody th {
+    background: #eef8fb;
+    border-bottom: 0;
+    border-radius: 10px 10px 0 0;
+    padding-bottom: 0.35rem;
+  }
+
+  .sobre-table tbody td {
+    border-bottom: 0;
+    padding-top: 0.25rem;
+  }
+
+  .sobre-table tbody td:last-child {
+    width: 100%;
+    text-align: left;
+    padding-bottom: 0.95rem;
+  }
+
+  .sobre-table tbody tr {
+    margin-bottom: 0.65rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
   }
 }
 

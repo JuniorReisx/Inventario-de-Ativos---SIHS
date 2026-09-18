@@ -1,4 +1,4 @@
-import { React, type AllWidgetProps, UrlManager, getAppStore } from 'jimu-core'
+import { React, ReactDOM, type AllWidgetProps, UrlManager, getAppStore } from 'jimu-core'
 import './style.css'
 
 type NavItem = {
@@ -80,7 +80,6 @@ const scrollPageToTop = () => {
 
 const Widget = (props: AllWidgetProps<any>) => {
   const [menuOpen, setMenuOpen] = React.useState(false)
-  const [menuTop, setMenuTop] = React.useState(72)
   const [currentPageId, setCurrentPageId] = React.useState<string | undefined>(
     () => getCurrentPageId() || (props.queryObject?.page as string | undefined)
   )
@@ -89,31 +88,18 @@ const Widget = (props: AllWidgetProps<any>) => {
   const portalLogoUrl = `${props.context.folderUrl}dist/runtime/assets/portal.png`
   const brasaoUrl = `${props.context.folderUrl}dist/runtime/assets/brasao.png`
 
-  const updateMenuPosition = React.useCallback(() => {
-    const el = rootRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    setMenuTop(Math.max(rect.bottom, 0))
-  }, [])
-
-  React.useEffect(() => {
-    if (!menuOpen) return
-    updateMenuPosition()
-    window.addEventListener('resize', updateMenuPosition)
-    window.addEventListener('scroll', updateMenuPosition, true)
-    return () => {
-      window.removeEventListener('resize', updateMenuPosition)
-      window.removeEventListener('scroll', updateMenuPosition, true)
-    }
-  }, [menuOpen, updateMenuPosition])
-
   React.useEffect(() => {
     if (!menuOpen) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setMenuOpen(false)
     }
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
+    return () => {
+      document.body.style.overflow = prevOverflow
+      document.removeEventListener('keydown', onKeyDown)
+    }
   }, [menuOpen])
 
   React.useEffect(() => {
@@ -150,13 +136,7 @@ const Widget = (props: AllWidgetProps<any>) => {
   }
 
   const toggleMenu = () => {
-    setMenuOpen((open) => {
-      const next = !open
-      if (next) {
-        requestAnimationFrame(updateMenuPosition)
-      }
-      return next
-    })
+    setMenuOpen((open) => !open)
   }
 
   const renderLinks = (mobile = false) =>
@@ -234,24 +214,32 @@ const Widget = (props: AllWidgetProps<any>) => {
         </button>
       </header>
 
-      {menuOpen && (
-        <>
-          <button
-            type="button"
-            className="hp-header__backdrop"
-            aria-label="Fechar menu"
-            onClick={() => setMenuOpen(false)}
-            style={{ top: menuTop }}
-          />
-          <nav
-            className="hp-header__mobile is-open"
-            aria-label="Navegação mobile"
-            style={{ top: menuTop }}
-          >
-            {renderLinks(true)}
-          </nav>
-        </>
-      )}
+      {menuOpen &&
+        ReactDOM.createPortal(
+          <>
+            <button
+              type="button"
+              className="hp-header__backdrop"
+              aria-label="Fechar menu"
+              onClick={() => setMenuOpen(false)}
+            />
+            <nav className="hp-header__drawer is-open" aria-label="Navegação">
+              <div className="hp-header__drawer-head">
+                <strong>Menu</strong>
+                <button
+                  type="button"
+                  className="hp-header__drawer-close"
+                  aria-label="Fechar menu"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+              {renderLinks(true)}
+            </nav>
+          </>,
+          document.body
+        )}
     </div>
   )
 }

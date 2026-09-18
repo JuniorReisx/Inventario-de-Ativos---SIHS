@@ -866,7 +866,7 @@
   .esgo-painel .stage-row{
     grid-template-columns: 1fr;
   }
-  .esgo-painel .stage-map .map-slot{ height: 600px; }
+  .esgo-painel .stage-map .map-slot{ height: min(52vh, 480px); min-height: 280px; }
   .esgo-painel .seg{ flex-direction: row; }
   .esgo-painel .seg button{
     flex: 1;
@@ -880,7 +880,7 @@
 
 @media (max-width: 700px) {
   .esgo-painel .data-grid{ grid-template-columns: 1fr; }
-  .esgo-painel .stage-map .map-slot{ height: 520px; }
+  .esgo-painel .stage-map .map-slot{ height: min(46vh, 380px); min-height: 260px; }
 }
 
 .esgo-painel .stage-filters, .esgo-painel .stage-map, .esgo-painel .data-grid > .panel{
@@ -2275,10 +2275,84 @@
 
 /* ── Responsivo ── */
 @media (max-width: 768px) {
+  .esgo-painel{
+    overflow-x: hidden;
+    font-size: 15.5px;
+  }
   .esgo-painel .search-box{ width: 100%; }
-  .esgo-painel .search-box input{ width: 100%; }
-  .esgo-painel main{ padding: 0 14px 40px; }
-  .esgo-painel .meta-footer{ padding: 16px 16px 26px; }
+  .esgo-painel .search-box input{ width: 100%; min-height: 44px; }
+  .esgo-painel .regiao-select,
+  .esgo-painel .btn-aglomerados,
+  .esgo-painel .semi-region-toggle{
+    min-height: 44px;
+    width: 100%;
+  }
+  .esgo-painel main{ padding: 0 12px 32px; }
+  .esgo-painel .meta-footer{ padding: 16px 12px 26px; gap: 6px; }
+  .esgo-painel .var-banner{
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .esgo-painel .btn-export-pdf{
+    margin-left: 0;
+    width: 100%;
+    min-height: 44px;
+  }
+  .esgo-painel .panel-header,
+  .esgo-painel .recorte-panel__head{
+    padding: 12px 14px;
+  }
+  .esgo-painel .panel-body,
+  .esgo-painel .recorte-panel__body{
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .esgo-painel .muni-detail-title{ font-size: 17px; }
+  .esgo-painel .comp-card-compare{
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .esgo-painel .comp-card-compare__item{
+    border-right: 0;
+    padding: 0 0 8px;
+    border-bottom: 1px solid color-mix(in srgb, var(--primary) 12%, transparent);
+  }
+  .esgo-painel .comp-card-compare__item:last-child{
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+  .esgo-painel .comp-card-compare__item.is-local strong{ font-size: 1.55rem; }
+  .esgo-painel .popup-panel{
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-width: none;
+    max-height: min(70vh, 520px);
+  }
+  .esgo-painel .info-tip-pop{
+    right: auto;
+    left: 0;
+    width: min(280px, calc(100vw - 40px));
+  }
+  .esgo-painel .sihs-pie__viz{
+    width: min(196px, 70vw);
+    height: min(196px, 70vw);
+  }
+  .esgo-painel .setor-popup.is-open{
+    top: auto;
+    bottom: 12px;
+    right: 12px;
+    left: 12px;
+    transform: none;
+    width: auto;
+    max-height: min(48vh, 360px);
+  }
+}
+
+@media (max-width: 480px) {
+  .esgo-painel .kpis,
+  .esgo-painel .kpis-compare{ grid-template-columns: 1fr; }
+  .esgo-painel .comp-cards{ grid-template-columns: 1fr; }
 }
 
 .esgo-painel {

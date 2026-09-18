@@ -439,6 +439,11 @@
   .ih-cards-widget .ih-cards-grid {
     grid-template-columns: 1fr;
   }
+
+  .ih-cards-widget .ih-cards-section {
+    padding: 1.1rem 0.9rem 1.25rem;
+    border-radius: 16px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
