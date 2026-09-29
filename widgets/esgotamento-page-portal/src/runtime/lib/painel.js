@@ -50,10 +50,11 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
   function formatCodigo(value){
     const raw = String(value ?? '').trim();
     if(!raw || raw === '—') return '—';
+    if(/^\d+$/.test(raw)) return raw;
     const sci = raw.replace(/\s/g, '').replace(',', '.');
-    if(/e[+-]?\d+/i.test(sci) || typeof value === 'number'){
-      const n = typeof value === 'number' ? value : Number(sci);
-      if(Number.isFinite(n)){
+    if(/^-?\d+(?:\.\d+)?e[+-]?\d+$/i.test(sci)){
+      const n = Number(sci);
+      if(Number.isFinite(n) && n !== 0){
         return Math.round(n).toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 0 });
       }
     }
@@ -831,6 +832,7 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
           </section>
         </div>
         <p class="ur-lead">Nos setores, o Censo detalha só <b>rede</b>, <b>com banheiro fora da rede</b> e <b>sem banheiro</b>. Fossa, vala e rio entram juntos no grupo “fora da rede” (o detalhe completo está nos cards de formas acima).</p>
+        <p class="ur-source">Os dados relacionados aos Setores Censitários foram extraídos do site do IBGE com base no Censo Demográfico de 2022, considerando a variável Agregados por Município - Características do Domicílio, atualizados em 17/04/2025.</p>
       </div>`;
     bindPieInteractions(slot);
   }
@@ -1089,16 +1091,15 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
       title.textContent = `Setores censitários — ${nm} · ${countLabel}`;
     }
     if(tbody) tbody.innerHTML = rows.map(r => {
+      const shown = formatCodigo(r.codAglom);
       const codigo = String(r.codigo || '').replace(/"/g, '&quot;');
       const oid = Number(r.oid) > 0 ? String(Math.round(Number(r.oid))) : '';
       const tipo = String(r.tipo || '—').replace(/</g, '&lt;');
-      const nome = String(r.nome || '—').replace(/</g, '&lt;');
       const situacao = String(r.situacao || '—').replace(/</g, '&lt;');
-      const codAglom = formatCodigo(r.codAglom || r.codigo).replace(/</g, '&lt;');
+      const codAglom = shown.replace(/</g, '&lt;');
       return `
       <tr class="aglomerado-row" data-codigo="${codigo}" data-oid="${oid}" tabindex="0" role="button" title="Selecionar no mapa">
         <td class="cod-aglom">${codAglom}</td>
-        <td>${nome}</td>
         <td>${tipo}</td>
         <td>${situacao}</td>
         <td class="num">${fmt(r.populacao)}</td>
@@ -1122,11 +1123,11 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
     const filtered = setoresModalAll.filter((row) => {
       if(tipo && String(row.tipo || '') !== tipo) return false;
       if(!query) return true;
-      const nome = normalizeSearch(row.nome);
-      const codigo = normalizeSearch(formatCodigo(row.codAglom || row.codigo));
+      const tipoTxt = normalizeSearch(row.tipo);
+      const codigo = normalizeSearch(formatCodigo(row.codAglom));
       const codigoRaw = normalizeSearch(row.codigo);
-      const digits = String(row.codAglom || row.codigo || '').replace(/\D/g, '');
-      if(nome.includes(query) || codigo.includes(query) || codigoRaw.includes(query)) return true;
+      const digits = String(row.codigo || '').replace(/\D/g, '');
+      if(tipoTxt.includes(query) || codigo.includes(query) || codigoRaw.includes(query)) return true;
       if(queryDigits && digits.includes(queryDigits)) return true;
       return false;
     });
@@ -1169,7 +1170,7 @@ export function initPainelEsgoto (root, GEO, PTS_DATA, mapApi, SETORES) {
     const table = qs('#'+'aglomeradosTable');
     const title = qs('#'+'aglomeradosTitle');
     if(title) title.textContent = `Setores censitários — ${nm}`;
-    if(tbody) tbody.innerHTML = `<tr><td colspan="6">Carregando setores censitários…</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="5">Carregando setores censitários…</td></tr>`;
     if(table) table.style.display = '';
     if(empty) empty.style.display = 'none';
     resetSetoresFilters();

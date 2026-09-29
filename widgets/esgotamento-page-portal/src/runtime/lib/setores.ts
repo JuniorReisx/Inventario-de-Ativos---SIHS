@@ -17,14 +17,19 @@ function fieldKey (value: string): string {
     .toLowerCase()
 }
 
+function isBlankCode (value: string): boolean {
+  const t = String(value || '').trim()
+  return !t || t === '—' || t === '-' || t === '0' || t.toLowerCase() === 'null' || t.toLowerCase() === 'undefined'
+}
+
 function integerCodeFromNumber (n: number): string {
-  if (!Number.isFinite(n)) return ''
+  if (!Number.isFinite(n) || n === 0) return ''
   const rounded = Math.round(n)
   try {
     return rounded.toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 0 })
   } catch {
     const text = String(rounded)
-    if (/e/i.test(text)) return text.replace(/e\+?/i, '')
+    if (/e/i.test(text)) return ''
     return text
   }
 }
@@ -32,13 +37,18 @@ function integerCodeFromNumber (n: number): string {
 function codeText (value: any): string {
   try {
     if (value == null || value === '') return ''
+    if (typeof value === 'bigint') {
+      const s = value.toString()
+      return isBlankCode(s) ? '' : s
+    }
     if (typeof value === 'number') return integerCodeFromNumber(value)
     const raw = String(value).trim()
-    if (!raw || raw === '—') return raw === '—' ? '—' : ''
+    if (isBlankCode(raw)) return ''
     const sci = raw.replace(/\s/g, '').replace(',', '.')
     if (/^-?\d+(?:\.\d+)?e[+-]?\d+$/i.test(sci)) {
       return integerCodeFromNumber(Number(sci))
     }
+    if (/^\d+\.0+$/.test(raw)) return raw.replace(/\.0+$/, '')
     return raw
   } catch {
     return String(value ?? '').trim()
@@ -67,11 +77,11 @@ function looksLikeCodeField (name: string, alias = ''): boolean {
 function pickBestCode (layer: any, attrs: Record<string, any>, preferred?: string): string {
   if (preferred) {
     const direct = codeText(attrs[preferred])
-    if (direct && direct !== '0') return direct
+    if (direct && !isBlankCode(direct)) return direct
     const byLower = Object.keys(attrs || {}).find((key) => key.toLowerCase() === preferred.toLowerCase())
     if (byLower) {
       const value = codeText(attrs[byLower])
-      if (value && value !== '0') return value
+      if (value && !isBlankCode(value)) return value
     }
   }
   const named = pickCode(attrs, [
@@ -82,12 +92,12 @@ function pickBestCode (layer: any, attrs: Record<string, any>, preferred?: strin
   for (const field of layer?.fields || []) {
     if (!looksLikeCodeField(field?.name, field?.alias || '')) continue
     const value = codeText(attrs[field.name])
-    if (value && value !== '0') return value
+    if (value && !isBlankCode(value)) return value
   }
   for (const [key, raw] of Object.entries(attrs || {})) {
     if (!looksLikeCodeField(key)) continue
     const value = codeText(raw)
-    if (value && value !== '0') return value
+    if (value && !isBlankCode(value)) return value
   }
   return ''
 }
@@ -256,6 +266,32 @@ function decodeField (layer: any, fieldName: string, raw: any): string {
   return text(raw)
 }
 
+function attrOf (attrs: Record<string, any>, fieldName: string): any {
+  if (!attrs || !fieldName) return undefined
+  if (Object.prototype.hasOwnProperty.call(attrs, fieldName)) return attrs[fieldName]
+  const hit = Object.keys(attrs).find((key) => key.toLowerCase() === fieldName.toLowerCase())
+  return hit ? attrs[hit] : undefined
+}
+
+function pickAglomLabel (
+  layer: any,
+  attrs: Record<string, any>,
+  aglomField: string,
+  aglomCodField: string
+): string {
+  const decodedCode = decodeField(layer, aglomCodField, attrOf(attrs, aglomCodField))
+  if (decodedCode && decodedCode !== '0') return decodedCode
+  const decodedName = decodeField(layer, aglomField, attrOf(attrs, aglomField))
+    || pickAttr(attrs, ['nm_aglom', 'nome_aglomerado', 'aglomerado', 'nome_do_aglomerado'])
+  if (decodedName) return decodedName
+  const rawCode = attrOf(attrs, aglomCodField)
+  if (rawCode === 0 || rawCode === '0' || rawCode == null || String(rawCode).trim() === '') {
+    return 'Não especial'
+  }
+  const asText = codeText(rawCode)
+  return asText || 'Não especial'
+}
+
 function pickAttr (attrs: Record<string, any>, candidates: string[]): string {
   if (!attrs) return ''
   const byLower = new Map(Object.keys(attrs).map((key) => [key.toLowerCase(), key]))
@@ -275,13 +311,14 @@ function pickCode (attrs: Record<string, any>, candidates: string[]): string {
     const actual = byLower.get(candidate.toLowerCase())
     if (actual == null) continue
     const value = codeText(attrs[actual])
-    if (value) return value
+    if (value && !isBlankCode(value)) return value
   }
   return ''
 }
 
 function fieldType (layer: any, fieldName: string): string {
-  const field = (layer?.fields || []).find((item: any) => String(item?.name || '') === fieldName)
+  const want = String(fieldName || '').toLowerCase()
+  const field = (layer?.fields || []).find((item: any) => String(item?.name || '').toLowerCase() === want)
   return String(field?.type || '').toLowerCase()
 }
 
@@ -319,7 +356,7 @@ export async function querySetoresDoMunicipio (
   const aglomField = knownField(available, resolveField(layer, 'nm_aglom', 'nome_aglomerado', 'aglomerado', 'nome_do_aglomerado'))
   const aglomCodField = knownField(
     available,
-    resolveExactField(layer, 'cd_aglom', 'cd_aglomerado', 'codigo_aglomerado', 'codigo_do_aglomerado', 'cod_aglom')
+    resolveExactField(layer, 'cd_aglom', 'cd_aglomerado', 'codigo_aglomerado', 'codigo_do_aglomerado', 'cod_aglom', 'cd_aglo')
   )
   const oidField = String(layer.objectIdField || 'OBJECTID')
   const wanted = [sitField, codField, nameField, setorField, tipoField, aglomField, aglomCodField, oidField, 'v0001', 'v0002']
@@ -372,17 +409,17 @@ export async function querySetoresDoMunicipio (
       const situacao = classifySituacao(sitField ? attrs[sitField] : pickAttr(attrs, ['situacao', 'nm_sit']))
         || pickAttr(attrs, ['situacao', 'nm_sit'])
         || '—'
+      const tipo = decodeField(layer, tipoField, tipoField ? attrs[tipoField] : null)
+        || pickAttr(attrs, ['nm_tipo', 'tipo_sc', 'tipo_setor'])
+        || '—'
+      const setorCode = pickBestCode(layer, attrs, setorField)
       rows.push({
-        codigo: pickBestCode(layer, attrs, setorField) || '—',
-        codAglom: pickBestCode(layer, attrs, aglomCodField || setorField) || '—',
+        codigo: setorCode || '—',
+        codAglom: setorCode || pickAglomLabel(layer, attrs, aglomField, aglomCodField),
         oid: Number(attrs[oidField] ?? attrs.OBJECTID ?? attrs.objectid) || 0,
         situacao,
-        tipo: decodeField(layer, tipoField, tipoField ? attrs[tipoField] : null)
-          || pickAttr(attrs, ['nm_tipo', 'tipo_sc', 'tipo_setor'])
-          || '—',
-        nome: decodeField(layer, aglomField, aglomField ? attrs[aglomField] : null)
-          || pickAttr(attrs, ['nm_aglom', 'nome_aglomerado', 'aglomerado', 'nome_do_aglomerado'])
-          || '—',
+        tipo,
+        nome: tipo,
         nm_mun: (nameField ? text(attrs[nameField]) : '') || options.nmMun || '',
         populacao: num(attrs.v0001),
         domicilios: num(attrs.v0002)

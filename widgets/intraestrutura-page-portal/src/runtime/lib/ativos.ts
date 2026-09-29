@@ -1,3 +1,4 @@
+import { coordFromGeometry, formatCoordDms } from './coords'
 import { findLayer } from './layers'
 import { escapeSqlString, normalizeMunName } from './municipios'
 
@@ -26,6 +27,17 @@ export interface AtivoItem {
   oid: number
   geometry?: any
   layerId?: string
+  coordDms?: string
+  coordDecimal?: string
+}
+
+function coordParts (geometry: any): { coordDms: string, coordDecimal: string } {
+  const coord = coordFromGeometry(geometry)
+  if (!coord) return { coordDms: '', coordDecimal: '' }
+  return {
+    coordDms: formatCoordDms(coord),
+    coordDecimal: `${coord.lat.toFixed(6)}, ${coord.lon.toFixed(6)}`
+  }
 }
 
 export const ASSET_DEFS: AssetDef[] = [
@@ -49,7 +61,7 @@ export const ASSET_DEFS: AssetDef[] = [
   },
   {
     id: 'reservatorios',
-    title: 'Reservatórios',
+    title: 'Barragens',
     layerTitle: 'Reservatórios',
     nameFields: ['barragem', 'n_secund'],
     municipalityFields: ['municipio', 'nm_mun']
@@ -106,7 +118,8 @@ function toItem (def: AssetDef, layer: any, feature: any): AtivoItem | null {
     oidField,
     oid,
     geometry: feature.geometry || null,
-    layerId: layer.id
+    layerId: layer.id,
+    ...coordParts(feature.geometry)
   }
 }
 
@@ -174,12 +187,13 @@ export async function searchAtivos (
     assetType: AssetType
     selectedName?: string | null
     territorialScope?: boolean
+    geometry?: any
     territorialWhere: (layer: any) => string
   }
 ): Promise<AtivoItem[]> {
   const queryText = options.searchText.trim()
   const hasSearch = queryText.length >= 2
-  const hasScope = Boolean(options.selectedName || options.territorialScope)
+  const hasScope = Boolean(options.selectedName || options.territorialScope || options.geometry)
   if (!hasSearch && !hasScope) return []
 
   const defs = options.assetType
@@ -193,20 +207,24 @@ export async function searchAtivos (
 
       await layer.load?.()
       const search = hasSearch ? assetSearchWhere(layer, def, queryText) : ''
-      const territorial = options.territorialWhere(layer)
+      const territorial = options.geometry ? '1=1' : options.territorialWhere(layer)
       const parts = [territorial, search].filter((part) => part && part !== '1=1')
-      if (!parts.length) return []
-      const where = parts.length === 1 ? parts[0] : parts.map((part) => `(${part})`).join(' AND ')
+      if (!parts.length && !options.geometry) return []
+      const where = parts.length === 1 ? parts[0] : parts.length ? parts.map((part) => `(${part})`).join(' AND ') : '1=1'
 
       const available = fieldSet(layer)
       const query = layer.createQuery()
       query.where = where
       query.returnGeometry = true
-      query.num = options.selectedName ? 200 : options.territorialScope ? 400 : 80
+      query.num = options.geometry ? 400 : options.selectedName ? 200 : options.territorialScope ? 400 : 80
       query.outFields = [
         layer.objectIdField || 'objectid',
         ...pickExisting(available, [...def.nameFields, ...def.municipalityFields])
       ]
+      if (options.geometry) {
+        query.geometry = options.geometry
+        query.spatialRelationship = 'intersects'
+      }
 
       const result = await layer.queryFeatures(query)
       return (result.features || [])
@@ -217,7 +235,7 @@ export async function searchAtivos (
 
   return groups
     .flat()
-    .filter((item) => ativoBelongsToMunicipio(item, options.selectedName))
+    .filter((item) => options.geometry || ativoBelongsToMunicipio(item, options.selectedName))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
 }
 
@@ -288,6 +306,7 @@ export async function listAtivosRelatorio (
   options: {
     selectedName?: string | null
     territorialWhere: (layer: any) => string
+    geometry?: any
     maxPerKind?: number
   }
 ): Promise<{
@@ -312,13 +331,17 @@ export async function listAtivosRelatorio (
     const localityFields = pickExisting(available, def.localityFields || def.nameFields)
     const typeFields = pickExisting(available, def.typeFields || [])
     const munFields = pickExisting(available, def.municipalityFields)
-    const territorial = options.territorialWhere(layer)
+    const territorial = options.geometry ? '1=1' : options.territorialWhere(layer)
     const where = territorial && territorial !== '1=1' ? territorial : '1=1'
 
     const query = layer.createQuery()
     query.where = where
     query.returnGeometry = false
     query.num = maxPerKind + 1
+    if (options.geometry) {
+      query.geometry = options.geometry
+      query.spatialRelationship = 'intersects'
+    }
     query.outFields = [
       layer.objectIdField || 'objectid',
       ...localityFields,

@@ -499,8 +499,24 @@
   box-shadow: 0 10px 28px rgba(0, 33, 59, 0.08);
 }
 
-.infra-sistemas__map-wrap .mun-popup {
-  z-index: 8;
+.infra-sistemas__map-wrap .mun-popup-dock {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  z-index: 20;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.infra-sistemas__map-wrap .mun-popup-dock .mun-popup {
+  pointer-events: auto;
+}
+
+.infra-sistemas__map-wrap .mun-popup.is-open {
+  z-index: 20;
+  max-height: min(62vh, 460px);
 }
 
 .infra-sistemas__map-wrap::before {
@@ -530,115 +546,6 @@
 
 .infra-sistemas__map .esri-basemap-gallery {
   max-height: min(380px, 58vh);
-}
-
-.infra-sistemas__legend-card {
-  position: absolute;
-  left: 0.7rem;
-  bottom: 2.1rem;
-  z-index: 3;
-  width: min(260px, calc(100% - 1.4rem));
-  overflow: hidden;
-  border-radius: 12px;
-  background: #fff;
-  border: 1px solid rgba(183, 196, 207, 0.95);
-  box-shadow: 0 10px 28px rgba(0, 33, 59, 0.16);
-}
-
-.infra-sistemas__legend-card > button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 0.6rem 0.75rem;
-  border: 0;
-  background:
-    radial-gradient(ellipse 70% 120% at 0% 0%, var(--accent-glow), transparent 62%),
-    linear-gradient(180deg, #001824 0%, #002231 100%);
-  color: #fff;
-  font-family: inherit;
-  font-size: 0.75rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.infra-sistemas__legend-card em {
-  font-style: normal;
-  color: var(--accent-2);
-}
-
-.infra-sistemas__legend {
-  max-height: 280px;
-  overflow: auto;
-  padding: 0.55rem 0.7rem 0.7rem;
-}
-
-.infra-sistemas__legend h4 {
-  margin: 0 0 0.4rem;
-  color: #00213b;
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-.infra-sistemas__legend ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.infra-sistemas__legend li {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.18rem 0;
-}
-
-.infra-sistemas__legend-swatch {
-  display: grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-}
-
-.infra-sistemas__legend-swatch img,
-.infra-sistemas__legend-swatch svg,
-.infra-sistemas__legend-swatch canvas {
-  max-width: 16px;
-  max-height: 16px;
-}
-
-.infra-sistemas__legend-swatch .infra-map-legend__fallback {
-  display: block;
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  box-shadow: inset 0 0 0 1px rgba(0, 33, 59, 0.2);
-}
-
-.infra-sistemas__legend li span:nth-child(2) {
-  color: #244354;
-  font-size: 0.74rem;
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-.infra-sistemas__legend li small {
-  color: #0a5c66;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
-  font-size: 0.66rem;
-  font-weight: 600;
-}
-
-.infra-sistemas__legend-empty {
-  margin: 0;
-  color: #5d7380;
-  font-size: 0.75rem;
-  font-weight: 600;
 }
 
 .infra-sistemas__overlay {

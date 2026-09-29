@@ -2199,7 +2199,7 @@
   background: var(--accent-muted);
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 2;
   white-space: nowrap;
   overflow-wrap: normal;
   word-break: normal;
@@ -2214,7 +2214,8 @@
 
 .esgo-painel #aglomeradosTable th:nth-child(1),
 .esgo-painel #aglomeradosTable th:nth-child(2){
-  background: var(--primary-light);
+  background: var(--primary);
+  white-space: nowrap;
 }
 
 .esgo-painel #aglomeradosTable th,
@@ -2226,7 +2227,12 @@
 }
 
 .esgo-painel #aglomeradosTable td.cod-aglom{
+  min-width: 9.5rem;
   font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--primary);
 }
 
 .esgo-painel .data-table td.num{
@@ -2409,6 +2415,14 @@
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--texto-claro);
+}
+.esgo-painel .ur-source{
+  margin: -8px 0 0;
+  padding: 0 2px 2px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--texto-claro);
+  opacity: 0.92;
 }
 .esgo-painel .ur-panel{
   display: flex;

@@ -94,6 +94,7 @@ export interface InfraChart {
   title: string
   layerTitle: string
   note?: string
+  source?: string
   views: ChartView[]
 }
 
@@ -123,11 +124,12 @@ export const RESERVATORIO_EMPREENDEDOR_GROUPS = [
 export const CHART_DEFS = [
   {
     id: 'reservatorios',
-    title: 'Reservatórios',
+    title: 'Barragens',
     layerTitle: 'Reservatórios',
+    source: 'SNISB-ANA · 2026',
     views: [
       { id: 'uso', subtitle: 'Uso principal', field: 'uso_princ', layout: 'pie' as const },
-      { id: 'empreendedores', subtitle: 'Empreendedores', field: 'empreendedor', layout: 'pie' as const, bucket: 'empreendedor' as const, note: 'Principais empreendedores, com mais de 15 reservatórios' },
+      { id: 'empreendedores', subtitle: 'Empreendedores', field: 'empreendedor', layout: 'pie' as const, bucket: 'empreendedor' as const, note: 'Principais empreendedores, com mais de 15 barragens' },
       { id: 'porte', subtitle: 'Porte', field: 'capacidade_t', layout: 'pie' as const, bucket: 'porte' as const }
     ]
   },
@@ -135,6 +137,7 @@ export const CHART_DEFS = [
     id: 'pocos',
     title: 'Poços',
     layerTitle: 'Poços',
+    source: 'CERB · 2026',
     views: [
       { id: 'condicao', subtitle: 'Condição dos poços', field: 'condicao', layout: 'pie' as const },
       { id: 'qualitativo', subtitle: 'Estado qualitativo', field: 'estado_qualitativo', layout: 'pie' as const }
@@ -144,6 +147,7 @@ export const CHART_DEFS = [
     id: 'sistemas',
     title: 'Sistemas de Abastecimento',
     layerTitle: 'Sistemas de Abastecimento',
+    source: 'CERB · 2026',
     note: 'Somente os sistemas geolocalizados que aparecem no mapa',
     views: [
       { id: 'tipo', subtitle: 'Tipo de sistema', field: 'tipo_sistema', layout: 'pie' as const },
@@ -173,6 +177,13 @@ type LayerScopeOptions = {
   filterSemiarido?: string
   filteredNames: string[]
   scoped: boolean
+  geometry?: any
+}
+
+function applyQueryGeometry (query: any, geometry?: any): void {
+  if (!query || !geometry) return
+  query.geometry = geometry
+  query.spatialRelationship = 'intersects'
 }
 
 function quoteIdent (name: string): string {
@@ -329,7 +340,8 @@ function porteSlicesFromCounts (counts: Map<string, number>): ChartSlice[] {
 async function queryVolumeValues (
   layer: any,
   field: string,
-  where: string
+  where: string,
+  geometry?: any
 ): Promise<Array<number | null>> {
   const values: Array<number | null> = []
   let start = 0
@@ -342,6 +354,7 @@ async function queryVolumeValues (
       query.outFields = [field]
       query.num = 2000
       query.start = start
+      applyQueryGeometry(query, geometry)
       const result = await layer.queryFeatures(query)
       const features = result.features || []
       for (const feature of features) {
@@ -376,6 +389,11 @@ async function queryPorteForScope (
   const nameField = pickField(available, NAME_FIELDS)
   const tiField = pickField(available, TI_FIELDS)
   const semiField = pickField(available, SEMI_FIELDS)
+
+  if (options.geometry && !options.selectedName) {
+    addValues(await queryVolumeValues(layer, field, '1=1', options.geometry))
+    return porteSlicesFromCounts(counts)
+  }
 
   if (options.selectedName && nameField) {
     addValues(await queryVolumeValues(
@@ -524,7 +542,8 @@ function slicesFromFeatures (features: any[], field: string, layer?: any): Chart
 async function queryBreakdownClient (
   layer: any,
   field: string,
-  where: string
+  where: string,
+  geometry?: any
 ): Promise<ChartSlice[]> {
   const counts = new Map<string, number>()
   let start = 0
@@ -536,6 +555,7 @@ async function queryBreakdownClient (
     query.outFields = [field]
     query.num = 2000
     query.start = start
+    applyQueryGeometry(query, geometry)
     const result = await layer.queryFeatures(query)
     const features = result.features || []
     for (const feature of features) {
@@ -557,7 +577,8 @@ async function queryBreakdownClient (
 async function queryBreakdown (
   layer: any,
   field: string,
-  where: string
+  where: string,
+  geometry?: any
 ): Promise<ChartSlice[]> {
   const available = fieldSet(layer)
   if (!available.has(field.toLowerCase())) return []
@@ -576,6 +597,7 @@ async function queryBreakdown (
           outStatisticFieldName: 'total'
         }
       ]
+      applyQueryGeometry(query, geometry)
       const result = await layer.queryFeatures(query)
       return slicesFromFeatures(result.features, field, layer)
     }
@@ -586,7 +608,7 @@ async function queryBreakdown (
       try {
         return await runStats(false)
       } catch {
-        return queryBreakdownClient(layer, field, where)
+        return queryBreakdownClient(layer, field, where, geometry)
       }
     }
   })
@@ -624,7 +646,11 @@ async function queryBreakdownForScope (
 
   if (options.selectedName) {
     const where = municipalityMatchWhere(layer, options.selectedName)
-    if (where) return queryBreakdown(layer, field, where)
+    if (where) return queryBreakdown(layer, field, where, options.geometry)
+  }
+
+  if (options.geometry && !options.selectedName) {
+    return queryBreakdown(layer, field, '1=1', options.geometry)
   }
 
   if (!options.scoped) {
@@ -663,6 +689,123 @@ function combineWhere (left: string, right: string): string {
   return `(${left}) AND (${right})`
 }
 
+export type ChartMapFilter = {
+  chartId: string
+  viewId: string
+  label: string
+  parts?: Array<{ label: string }>
+}
+
+function labelsMatchChart (left: string, right: string): boolean {
+  const a = normalizeEmp(left)
+  const b = normalizeEmp(right)
+  if (!a || !b) return false
+  return a === b || a.includes(b) || b.includes(a)
+}
+
+function uninformedFieldWhere (ident: string): string {
+  return `(${ident} IS NULL OR ${ident} = '')`
+}
+
+function codedValueClauses (layer: any, field: string, label: string): string[] {
+  const ident = quoteIdent(field)
+  const fieldInfo = (layer?.fields || []).find((item: any) => String(item?.name || '').toLowerCase() === field.toLowerCase())
+  const coded = fieldInfo?.domain?.codedValues as Array<{ code: any, name: string }> | undefined
+  if (!coded?.length) return []
+  const clauses: string[] = []
+  for (const item of coded) {
+    if (!labelsMatchChart(String(item?.name ?? ''), label) && !labelsMatchChart(String(item?.code ?? ''), label)) continue
+    const code = escapeSqlString(String(item.code))
+    const name = escapeSqlString(String(item.name ?? ''))
+    clauses.push(`${ident} = '${code}'`)
+    if (name) clauses.push(`${ident} = '${name}'`)
+  }
+  return clauses
+}
+
+function categoryLabelWhere (layer: any, field: string, label: string): string {
+  const ident = quoteIdent(field)
+  if (isUninformedLabel(label) || /^não informado$/i.test(label.trim())) {
+    return uninformedFieldWhere(ident)
+  }
+  const escaped = escapeSqlString(label)
+  const clauses = [
+    `${ident} = '${escaped}'`,
+    `UPPER(${ident}) = UPPER('${escaped}')`,
+    ...codedValueClauses(layer, field, label)
+  ]
+  const tokens = normalizeEmp(label).toUpperCase().split(' ').filter((token) => token.length >= 4)
+  if (tokens.length) {
+    const like = tokens.map((token) => escapeSqlString(token)).join('%')
+    clauses.push(`UPPER(${ident}) LIKE '%${like}%'`)
+  }
+  return `(${Array.from(new Set(clauses)).join(' OR ')})`
+}
+
+function porteClassWhere (ident: string, label: string): string {
+  if (isUninformedLabel(label) || /^não informado$/i.test(label.trim())) {
+    return uninformedFieldWhere(ident)
+  }
+  const classes = RESERVATORIO_PORTE_CLASSES
+  const index = classes.findIndex((item) => item.label === label)
+  if (index < 0) return ''
+  const max = classes[index].max
+  const prev = index > 0 ? classes[index - 1].max : null
+  if (max === Infinity) return prev != null ? `(${ident} > ${prev})` : `(${ident} IS NOT NULL)`
+  if (prev == null) return `(${ident} <= ${max})`
+  return `(${ident} > ${prev} AND ${ident} <= ${max})`
+}
+
+function empreendedorGroupWhere (ident: string, label: string): string {
+  if (label === 'Outros') {
+    const excluded = [
+      ...RESERVATORIO_EMPREENDEDOR_GROUPS.flatMap((group) => group.keys),
+      'associacao idealista'
+    ]
+    const nots = excluded.map((key) => `UPPER(${ident}) NOT LIKE '%${escapeSqlString(key.toUpperCase())}%'`)
+    return `(${ident} IS NOT NULL AND ${ident} <> '' AND ${nots.join(' AND ')})`
+  }
+  if (/^car \//i.test(label) || /bombaca|idealista/i.test(normalizeEmp(label))) {
+    return `(UPPER(${ident}) LIKE '%BOMBACA%' OR UPPER(${ident}) LIKE '%IDEALISTA%' OR UPPER(${ident}) LIKE 'CAR %' OR UPPER(${ident}) LIKE 'CAR/%' OR UPPER(${ident}) = 'CAR')`
+  }
+  const group = RESERVATORIO_EMPREENDEDOR_GROUPS.find((item) => item.label === label)
+  if (!group) return ''
+  return `(${group.keys.map((key) => `UPPER(${ident}) LIKE '%${escapeSqlString(key.toUpperCase())}%'`).join(' OR ')})`
+}
+
+export function chartFilterWhere (layer: any, filter?: ChartMapFilter | null): string {
+  if (!layer || !filter?.label) return ''
+  const def = CHART_DEFS.find((item) => item.id === filter.chartId)
+  if (!def) return ''
+  const title = String(layer.title || layer.layerTitle || '')
+  if (title !== def.layerTitle) return ''
+  const view = def.views.find((item) => item.id === filter.viewId)
+  if (!view) return ''
+  const extra = 'bucket' in view && view.bucket === 'empreendedor'
+    ? EMPREENDEDOR_FIELDS
+    : 'bucket' in view && view.bucket === 'porte'
+      ? PORTE_VOLUME_FIELDS
+      : []
+  const field = resolveChartField(layer, view.field, extra)
+  if (!field) return ''
+  const ident = quoteIdent(field)
+  const labels = (filter.parts?.length ? filter.parts.map((part) => part.label) : [filter.label])
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+  if (!labels.length) return ''
+
+  if ('bucket' in view && view.bucket === 'porte') {
+    const parts = labels.map((label) => porteClassWhere(ident, label)).filter(Boolean)
+    return parts.length ? `(${parts.join(' OR ')})` : ''
+  }
+  if ('bucket' in view && view.bucket === 'empreendedor') {
+    const parts = labels.map((label) => empreendedorGroupWhere(ident, label) || categoryLabelWhere(layer, field, label)).filter(Boolean)
+    return parts.length ? `(${parts.join(' OR ')})` : ''
+  }
+  const parts = labels.map((label) => categoryLabelWhere(layer, field, label))
+  return `(${parts.join(' OR ')})`
+}
+
 export function layerScopeWhere (
   layer: any,
   options: LayerScopeOptions
@@ -676,6 +819,8 @@ export function layerScopeWhere (
   if (options.selectedName) {
     return municipalityMatchWhere(layer, options.selectedName) || original
   }
+
+  if (options.geometry) return original
 
   if (!options.scoped) return original
 
@@ -735,12 +880,16 @@ export async function applyInfraLayerScope (
     searchText?: string
     setorSearch?: string
     setorTipo?: string
+    geometry?: any
+    chartFilter?: ChartMapFilter | null
   }
 ): Promise<void> {
   const scoped = Boolean(
-    options.selectedName || options.filterTerritorio || options.filterSemiarido
+    options.selectedName || options.filterTerritorio || options.filterSemiarido || options.geometry
   )
-  const assetType = options.assetType || ''
+  const assetType = options.chartFilter?.chartId
+    ? (options.chartFilter.chartId as AssetType)
+    : options.assetType || ''
   const searchText = options.searchText || ''
   const setorSearch = options.setorSearch || ''
   const setorTipo = options.setorTipo || ''
@@ -760,7 +909,8 @@ export async function applyInfraLayerScope (
         filterTerritorio: options.filterTerritorio,
         filterSemiarido: options.filterSemiarido,
         filteredNames: options.filteredNames,
-        scoped
+        scoped,
+        geometry: options.geometry
       })
       const assetDef = ASSET_DEFS.find((def) => def.layerTitle === layer.title || def.layerTitle === layer.layerTitle)
       const search = assetDef
@@ -768,7 +918,8 @@ export async function applyInfraLayerScope (
         : layer.title === SETOR_LAYER_TITLE || layer.layerTitle === SETOR_LAYER_TITLE
           ? setorFilterWhere(layer, setorSearch, setorTipo)
           : ''
-      layer.definitionExpression = combineWhere(territorial, search)
+      const slice = chartFilterWhere(layer, options.chartFilter)
+      layer.definitionExpression = combineWhere(combineWhere(territorial, search), slice)
     })
   )
 }
@@ -808,6 +959,7 @@ export function emptyCharts (status: ChartView['status'] = 'loading'): InfraChar
     title: def.title,
     layerTitle: def.layerTitle,
     note: 'note' in def ? def.note : undefined,
+    source: 'source' in def ? def.source : undefined,
     views: def.views.map((view) => ({
       id: view.id,
       subtitle: view.subtitle,
@@ -827,10 +979,11 @@ export async function loadInfraCharts (
     filterTerritorio: string
     filterSemiarido: string
     filteredNames: string[]
+    geometry?: any
   }
 ): Promise<InfraChart[]> {
   const scoped = Boolean(
-    options.selectedName || options.filterTerritorio || options.filterSemiarido
+    options.selectedName || options.filterTerritorio || options.filterSemiarido || options.geometry
   )
 
   return Promise.all(
@@ -881,7 +1034,8 @@ export async function loadInfraCharts (
               filterTerritorio: options.filterTerritorio,
               filterSemiarido: options.filterSemiarido,
               filteredNames: options.filteredNames,
-              scoped
+              scoped,
+              geometry: options.geometry
             }
             let items = 'bucket' in view && view.bucket === 'porte'
               ? await queryPorteForScope(layer, field, scope)
@@ -921,6 +1075,7 @@ export async function loadInfraCharts (
         title: def.title,
         layerTitle: def.layerTitle,
         note: 'note' in def ? def.note : undefined,
+        source: 'source' in def ? def.source : undefined,
         views
       }
     })

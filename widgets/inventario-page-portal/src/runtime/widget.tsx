@@ -68,7 +68,6 @@ import {
 import HeroPortal from './components/hero-portal'
 import CardsTelaInicial from './components/cards-telaincial'
 import PortalLoader from './components/portal-loader'
-import KaioChat from './components/kaio-chat'
 import './style.css'
 
 const { useCallback, useEffect, useMemo, useRef, useState } = React
@@ -2225,10 +2224,6 @@ const Widget = (props: AllWidgetProps<IMConfig>) => {
       <div className="sihs-page__cards">
         <CardsTelaInicial folderUrl={props.context.folderUrl} />
       </div>
-      <KaioChat
-        folderUrl={props.context.folderUrl}
-        apiUrl={props.config?.chatApiUrl}
-      />
     </div>
   )
 }

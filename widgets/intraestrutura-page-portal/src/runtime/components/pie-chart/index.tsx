@@ -20,13 +20,13 @@ const PALETTES: Record<string, string[]> = {
 const DEFAULT_PALETTE = ['#002231', '#0a5c66', '#1aa8c8', '#2fc4ff', '#5d7380', '#8aa0ab']
 
 const UNITS: Record<string, [string, string]> = {
-  reservatorios: ['reservatório', 'reservatórios'],
+  reservatorios: ['barragem', 'barragens'],
   pocos: ['poço', 'poços'],
   sistemas: ['sistema geolocalizado', 'sistemas geolocalizados']
 }
 
 const CHART_TITLES: Record<string, string> = {
-  reservatorios: 'Reservatórios',
+  reservatorios: 'Barragens',
   pocos: 'Poços',
   sistemas: 'Sistemas'
 }
@@ -39,6 +39,8 @@ type PieChartProps = {
   items: ChartSlice[]
   layout?: 'pie' | 'cards' | 'bars'
   preserveOrder?: boolean
+  selectedLabel?: string | null
+  onSliceSelect?: (slice: ChartSlice) => void
 }
 
 type SliceRow = ChartSlice & {
@@ -120,7 +122,7 @@ function placePopover (anchor: DOMRect, estimatedHeight = 280): PopoverPos {
   return { top: Math.max(12, above), left, placement: 'top' }
 }
 
-const PieChart = ({ chartId, items, preserveOrder = false }: PieChartProps) => {
+const PieChart = ({ chartId, items, preserveOrder = false, selectedLabel = null, onSliceSelect }: PieChartProps) => {
   const colors = PALETTES[chartId] || DEFAULT_PALETTE
   const rootRef = useRef<HTMLDivElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
@@ -154,7 +156,7 @@ const PieChart = ({ chartId, items, preserveOrder = false }: PieChartProps) => {
     })
   }, [grouped, colors, total])
 
-  const active = rows.find((row) => row.label === activeLabel) || null
+  const active = rows.find((row) => row.label === (activeLabel || selectedLabel)) || null
   const outros = rows.find((row) => row.label === 'Outros' && row.parts?.length) || null
 
   const syncPopover = () => {
@@ -260,12 +262,17 @@ const PieChart = ({ chartId, items, preserveOrder = false }: PieChartProps) => {
               const percent = total > 0 ? (part.total / total) * 100 : 0
               return (
                 <li key={part.label}>
-                  <span>
-                    {displayLabel(part.label)}
-                    {part.detail ? <small>{part.detail}</small> : null}
-                  </span>
-                  <b>{formatPopulation(part.total)}</b>
-                  <em>{formatPercent(percent)}</em>
+                  <button
+                    type="button"
+                    onClick={() => { onSliceSelect?.(part) }}
+                  >
+                    <span>
+                      {displayLabel(part.label)}
+                      {part.detail ? <small>{part.detail}</small> : null}
+                    </span>
+                    <b>{formatPopulation(part.total)}</b>
+                    <em>{formatPercent(percent)}</em>
+                  </button>
                 </li>
               )
             })}
@@ -297,11 +304,18 @@ const PieChart = ({ chartId, items, preserveOrder = false }: PieChartProps) => {
                     slice.end || slice.start + Math.PI * 2 - 1e-4
                   )}
                   fill={slice.color}
-                  className={activeLabel && activeLabel !== slice.label ? 'is-dim' : activeLabel === slice.label ? 'is-hot' : ''}
+                  className={
+                    (activeLabel || selectedLabel) === slice.label
+                      ? 'is-hot'
+                      : (activeLabel || selectedLabel)
+                        ? 'is-dim'
+                        : ''
+                  }
                   onMouseEnter={() => setActiveLabel(slice.label)}
                   onFocus={() => setActiveLabel(slice.label)}
                   onClick={(event) => {
                     if (slice.parts?.length) openOutrosPopup(event)
+                    onSliceSelect?.(slice)
                   }}
                   tabIndex={0}
                 >
@@ -322,7 +336,10 @@ const PieChart = ({ chartId, items, preserveOrder = false }: PieChartProps) => {
           {rows.map((row) => (
             <li
               key={row.label}
-              className={activeLabel === row.label ? 'is-active' : activeLabel ? 'is-dim' : ''}
+              className={[
+                activeLabel === row.label ? 'is-active' : activeLabel ? 'is-dim' : '',
+                selectedLabel === row.label ? 'is-selected' : ''
+              ].filter(Boolean).join(' ')}
               onMouseEnter={() => setActiveLabel(row.label)}
               onMouseLeave={() => setActiveLabel(null)}
             >
@@ -331,6 +348,7 @@ const PieChart = ({ chartId, items, preserveOrder = false }: PieChartProps) => {
                 onClick={(event) => {
                   setActiveLabel(row.label)
                   if (row.parts?.length) openOutrosPopup(event)
+                  onSliceSelect?.(row)
                 }}
               >
                 <i style={{ background: row.color }} />

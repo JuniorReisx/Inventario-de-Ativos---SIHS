@@ -18,7 +18,7 @@ export const PORTAL_MODULOS: ModuleItem[] = [
   {
     index: '02',
     title: 'Infraestrutura hídrica',
-    text: 'Inventário no mapa: reservatórios, sistemas de abastecimento e poços. Filtre por território, semiárido ou município e leia os gráficos do recorte.',
+    text: 'Inventário no mapa: barragens, sistemas de abastecimento e poços. Filtre por território, semiárido ou município e leia os gráficos do recorte.',
     pageLabel: 'Infraestrutura Hídrica',
     pageId: 'page_41'
   },

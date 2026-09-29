@@ -166,10 +166,21 @@ function isExcludedLayerTitle (title: string): boolean {
   if (EXCLUDED_LAYER_KEYS.some((key) => compact.includes(key.replace(/[^a-z0-9]/g, '')))) return true
   if (compact.includes('secouposterior')) return true
   if (/(^|[^a-z])seco([^a-z]|$)/.test(normalized)) return true
+  if (compact.includes('municipioselecionado')) return true
   return false
 }
 
-function layerIsAllowed (title: string, allowedKeys?: string[]): boolean {
+function isInternalOverlayLayer (layer: any): boolean {
+  const type = String(layer?.type || '').toLowerCase()
+  if (type === 'graphics') return true
+  if (String(layer?.listMode || '').toLowerCase() === 'hide') return true
+  return isExcludedLayerTitle(layer?.title || '')
+}
+
+function layerIsAllowed (layerOrTitle: any, allowedKeys?: string[]): boolean {
+  const layer = layerOrTitle && typeof layerOrTitle === 'object' ? layerOrTitle : null
+  const title = layer ? (layer.title || '') : String(layerOrTitle || '')
+  if (layer && isInternalOverlayLayer(layer)) return false
   if (isExcludedLayerTitle(title)) return false
   if (!allowedKeys?.length) return true
   const normalized = normalizeLayerTitle(title)
@@ -234,7 +245,8 @@ export function applyAllowedLayers (webMap: any, allowedKeys?: string[]): void {
   let keptVisible = false
   for (const layer of layers) {
     const title = layer?.title || ''
-    if (isExcludedLayerTitle(title) || (allowedKeys?.length && !layerIsAllowed(title, allowedKeys))) {
+    if (isInternalOverlayLayer(layer)) continue
+    if (isExcludedLayerTitle(title) || (allowedKeys?.length && !layerIsAllowed(layer, allowedKeys))) {
       layer.visible = false
       continue
     }
@@ -252,7 +264,7 @@ export function applyAllowedLayers (webMap: any, allowedKeys?: string[]): void {
     })
     if (total) total.visible = true
     else {
-      const first = layers.find((layer: any) => layerIsAllowed(layer?.title || '', allowedKeys))
+      const first = layers.find((layer: any) => layerIsAllowed(layer, allowedKeys))
       if (first) first.visible = true
     }
   }
@@ -261,7 +273,7 @@ export function applyAllowedLayers (webMap: any, allowedKeys?: string[]): void {
 export function listSistemasLayers (webMap: any, allowedKeys?: string[]): SistemaLayerItem[] {
   const layers = webMap?.layers?.toArray?.() || []
   return layers
-    .filter((layer: any) => layer && layer.title && layerIsAllowed(layer.title, allowedKeys))
+    .filter((layer: any) => layer && layer.title && layerIsAllowed(layer, allowedKeys))
     .map((layer: any) => ({
       id: layer.id,
       title: layer.title,
@@ -299,6 +311,21 @@ export async function orderTotalSistemasBreaksAscending (
   renderer.classBreakInfos = infos.reverse()
 }
 
+export function stripMunicipioSelectionOverlays (webMap: any): void {
+  const layers = [...(webMap?.layers?.toArray?.() || [])]
+  for (const layer of layers) {
+    const type = String(layer?.type || '').toLowerCase()
+    const title = String(layer?.title || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+    if (type !== 'graphics' || !title.includes('municipio selecionado')) continue
+    try { layer.removeAll?.() } catch (_) {}
+    layer.visible = false
+    try { webMap.remove(layer) } catch (_) {}
+  }
+}
+
 export function selectExclusiveSistemasLayer (
   webMap: any,
   layerId: string,
@@ -306,7 +333,11 @@ export function selectExclusiveSistemasLayer (
 ): void {
   const layers = webMap?.layers?.toArray?.() || []
   for (const layer of layers) {
-    if (!layerIsAllowed(layer?.title || '', allowedKeys)) {
+    if (isInternalOverlayLayer(layer)) {
+      if (String(layer?.type || '').toLowerCase() === 'graphics') layer.visible = false
+      continue
+    }
+    if (!layerIsAllowed(layer, allowedKeys)) {
       layer.visible = false
       continue
     }

@@ -252,12 +252,13 @@ export async function searchSetores (
     tipo?: string
     selectedName?: string | null
     territorialScope?: boolean
+    geometry?: any
     territorialWhere: (layer: any) => string
   }
 ): Promise<SetorItem[]> {
   const queryText = options.searchText.trim()
   const hasSearch = queryText.length >= 2
-  if (!hasSearch && !options.selectedName && !options.territorialScope) return []
+  if (!hasSearch && !options.selectedName && !options.territorialScope && !options.geometry) return []
 
   const layer = findLayer(webMap, { layerTitle: SETOR_LAYER_TITLE })
   if (!layer || typeof layer.queryFeatures !== 'function') return []
@@ -267,18 +268,22 @@ export async function searchSetores (
   const outFields = ['nm_aglom', 'nm_mun', 'nm_tipo', 'tipo_sc', 'tipo_setor', 'tipo']
     .filter((name) => available.has(name))
   const search = setorFilterWhere(layer, queryText, options.tipo || '')
-  const territorial = options.territorialWhere(layer)
+  const territorial = options.geometry ? '1=1' : options.territorialWhere(layer)
   const parts = [territorial, search].filter((part) => part && part !== '1=1')
-  if (!parts.length) return []
-  const where = parts.length === 1 ? parts[0] : parts.map((part) => `(${part})`).join(' AND ')
+  if (!parts.length && !options.geometry) return []
+  const where = parts.length === 1 ? parts[0] : parts.length ? parts.map((part) => `(${part})`).join(' AND ') : '1=1'
 
   const query = layer.createQuery()
   query.where = where
-  query.returnGeometry = false
-  query.returnDistinctValues = true
+  query.returnGeometry = Boolean(options.geometry)
+  query.returnDistinctValues = !options.geometry
   query.num = 500
   query.outFields = outFields.length ? outFields : ['*']
   query.orderByFields = available.has('nm_aglom') ? ['nm_aglom ASC'] : undefined
+  if (options.geometry) {
+    query.geometry = options.geometry
+    query.spatialRelationship = 'intersects'
+  }
 
   const collect = (features: any[]): SetorItem[] => {
     const seen = new Set<string>()

@@ -1,6 +1,7 @@
 import { loadArcGISJSAPIModules } from 'jimu-arcgis'
 import { normalizeMunName, resolveMunFields } from './municipios'
 import { findMunicipioLayer, getAllLayers } from './layers'
+import { coordFromGeometry, formatCoordDms } from './coords'
 
 const PORTAL_URL = 'https://portaldaagua.sihs.ba.gov.br/portal'
 const WEB_MAP_ID = '8fd43aa62abc49efac53cf5431b32a3a'
@@ -113,8 +114,35 @@ export async function createMapView (container: HTMLElement, webMap: any): Promi
     await view.goTo(view.extent.clone().expand(1.02), { animate: false })
   }
   captureHomeViewpoint(view)
+  attachCursorCoordsHud(view)
 
   return view
+}
+
+function attachCursorCoordsHud (view: any): void {
+  const host = view?.container as HTMLElement | null
+  if (!host || host.querySelector('.infra-cursor-coords')) return
+
+  const el = document.createElement('div')
+  el.className = 'infra-cursor-coords'
+  el.innerHTML = '<span class="infra-cursor-coords__dms"></span><span class="infra-cursor-coords__dec"></span>'
+  host.appendChild(el)
+  const dms = el.querySelector('.infra-cursor-coords__dms') as HTMLElement | null
+  const dec = el.querySelector('.infra-cursor-coords__dec') as HTMLElement | null
+
+  view.on('pointer-move', (event: any) => {
+    try {
+      const mapPoint = typeof view.toMap === 'function' ? view.toMap({ x: event.x, y: event.y }) : null
+      const coord = coordFromGeometry(mapPoint)
+      if (!coord || !dms || !dec) return
+      dms.textContent = formatCoordDms(coord)
+      dec.textContent = `${coord.lat.toFixed(6)}, ${coord.lon.toFixed(6)}`
+      el.classList.add('is-on')
+    } catch (_) {}
+  })
+  view.on('pointer-leave', () => {
+    el.classList.remove('is-on')
+  })
 }
 
 export async function resizeMapView (view: any): Promise<void> {
@@ -242,6 +270,139 @@ export async function zoomToExtent (view: any, extent: any): Promise<boolean> {
   return true
 }
 
+const COORD_MARKER_ID = 'infra-coord-search'
+const COORD_BUFFER_ID = 'infra-coord-buffer'
+
+function removeCoordGraphics (view: any, ids: string[]): void {
+  const graphics = view?.graphics
+  if (!graphics?.toArray) return
+  const wanted = new Set(ids)
+  graphics.toArray()
+    .filter((graphic: any) => wanted.has(graphic?.attributes?.id))
+    .forEach((graphic: any) => graphics.remove(graphic))
+}
+
+export function clearCoordMarker (view: any): void {
+  removeCoordGraphics(view, [COORD_MARKER_ID, COORD_BUFFER_ID])
+}
+
+export async function zoomToLonLat (view: any, lon: number, lat: number): Promise<boolean> {
+  if (!view || !Number.isFinite(lon) || !Number.isFinite(lat)) return false
+  const [Point, Graphic] = await loadArcGISJSAPIModules(['esri/geometry/Point', 'esri/Graphic'])
+  const point = new Point({ longitude: lon, latitude: lat })
+  clearCoordMarker(view)
+  view.graphics.add(new Graphic({
+    geometry: point,
+    attributes: { id: COORD_MARKER_ID },
+    symbol: {
+      type: 'simple-marker',
+      style: 'circle',
+      color: [26, 168, 200, 0.95],
+      size: 11,
+      outline: { color: [255, 255, 255, 0.95], width: 2 }
+    }
+  }))
+  await view.goTo({ target: point, scale: 50000 }, { duration: 800 })
+  return true
+}
+
+export async function zoomToCoordRadius (
+  view: any,
+  lon: number,
+  lat: number,
+  radiusKm: number,
+  options?: { duration?: number, fit?: boolean }
+): Promise<any | null> {
+  if (!view || !Number.isFinite(lon) || !Number.isFinite(lat) || !Number.isFinite(radiusKm)) return null
+  const [Point, Graphic, Polygon, projection] = await loadArcGISJSAPIModules([
+    'esri/geometry/Point',
+    'esri/Graphic',
+    'esri/geometry/Polygon',
+    'esri/geometry/projection'
+  ])
+  const km = Math.max(0.001, radiusKm)
+  const point = new Point({
+    longitude: lon,
+    latitude: lat,
+    spatialReference: { wkid: 4326 }
+  })
+  let buffer = haversineCirclePolygon(Polygon, lon, lat, km)
+  try {
+    await projection.load?.()
+    const viewSr = view.spatialReference
+    if (buffer && viewSr && typeof projection.project === 'function') {
+      const projected = projection.project(buffer, viewSr)
+      if (projected) buffer = projected
+    }
+  } catch (_) {}
+
+  clearCoordMarker(view)
+  if (buffer) {
+    view.graphics.add(new Graphic({
+      geometry: buffer,
+      attributes: { id: COORD_BUFFER_ID },
+      symbol: {
+        type: 'simple-fill',
+        color: [26, 168, 200, 0.12],
+        outline: { color: [10, 92, 102, 0.9], width: 2 }
+      }
+    }))
+  }
+  view.graphics.add(new Graphic({
+    geometry: point,
+    attributes: { id: COORD_MARKER_ID },
+    symbol: {
+      type: 'simple-marker',
+      style: 'circle',
+      color: [26, 168, 200, 0.95],
+      size: 11,
+      outline: { color: [255, 255, 255, 0.95], width: 2 }
+    }
+  }))
+  if (options?.fit !== false) {
+    const target = buffer || point
+    await view.goTo(target, { duration: options?.duration ?? 700 })
+  }
+  return buffer
+}
+
+function destinationLonLat (lat: number, lon: number, bearingRad: number, distanceKm: number): { lat: number, lon: number } {
+  const earthKm = 6371.0088
+  const angular = distanceKm / earthKm
+  const lat1 = lat * Math.PI / 180
+  const lon1 = lon * Math.PI / 180
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(angular) +
+    Math.cos(lat1) * Math.sin(angular) * Math.cos(bearingRad)
+  )
+  const lon2 = lon1 + Math.atan2(
+    Math.sin(bearingRad) * Math.sin(angular) * Math.cos(lat1),
+    Math.cos(angular) - Math.sin(lat1) * Math.sin(lat2)
+  )
+  return {
+    lat: lat2 * 180 / Math.PI,
+    lon: ((lon2 * 180 / Math.PI + 540) % 360) - 180
+  }
+}
+
+function haversineCirclePolygon (Polygon: any, lon: number, lat: number, radiusKm: number): any | null {
+  const steps = 128
+  const ring: number[][] = []
+  for (let i = 0; i <= steps; i++) {
+    const bearing = (i / steps) * Math.PI * 2
+    const dest = destinationLonLat(lat, lon, bearing, radiusKm)
+    ring.push([dest.lon, dest.lat])
+  }
+  try {
+    return new Polygon({
+      rings: [ring],
+      spatialReference: { wkid: 4326 }
+    })
+  } catch {
+    return null
+  }
+}
+
 export async function queryFirstGeometry (layer: any, where = '1=1'): Promise<any | null> {
   if (!layer || typeof layer.queryFeatures !== 'function') return null
   await layer.load?.()
@@ -315,20 +476,33 @@ interface HighlightState {
 const highlightByView = new WeakMap<object, HighlightState>()
 const homeByView = new WeakMap<object, any>()
 const selectedMunByView = new WeakMap<object, string>()
+const munZoomByView = new WeakMap<object, boolean>()
 
-export function captureHomeViewpoint (view: any): void {
-  if (!view || homeByView.has(view)) return
+export function captureHomeViewpoint (view: any, force = false): void {
+  if (!view || (!force && homeByView.has(view))) return
   const viewpoint = view.viewpoint?.clone?.()
   if (viewpoint) homeByView.set(view, viewpoint)
 }
 
+export function setSelectedMunicipioKey (view: any, key: string | null): void {
+  if (!view) return
+  if (key) {
+    selectedMunByView.set(view, key)
+    munZoomByView.set(view, true)
+  } else {
+    selectedMunByView.delete(view)
+    munZoomByView.delete(view)
+  }
+}
+
 export async function resetMunicipioView (view: any): Promise<void> {
   if (!view) return
-  const hadSelection = selectedMunByView.has(view)
+  const shouldRestore = Boolean(munZoomByView.get(view) || selectedMunByView.has(view))
   clearHighlight(view)
   selectedMunByView.delete(view)
+  munZoomByView.delete(view)
   const home = homeByView.get(view)
-  if (!hadSelection || !home) return
+  if (!shouldRestore || !home) return
   try {
     await view.goTo(home, { duration: 800 })
   } catch {
@@ -352,6 +526,32 @@ export function clearHighlight (view: any): void {
   state.handle?.remove?.()
   state.handle = null
   state.layer?.removeAll?.()
+  if (state.layer) {
+    state.layer.visible = false
+    try { view.map?.remove?.(state.layer) } catch (_) {}
+    state.layer = null
+  }
+}
+
+export async function highlightGeometry (
+  view: any,
+  geometry: any,
+  options?: {
+    outlineOnly?: boolean
+    theme?: 'default' | 'semiarido'
+  }
+): Promise<boolean> {
+  if (!view || !geometry) return false
+  return highlightWhere(view, {
+    objectIdField: 'oid',
+    load: async () => {},
+    createQuery: () => ({}),
+    queryFeatures: async () => ({ features: [{ geometry }] })
+  }, '1=1', {
+    outlineOnly: options?.outlineOnly !== false,
+    maxFeatures: 1,
+    theme: options?.theme
+  })
 }
 
 export async function highlightWhere (
@@ -405,9 +605,19 @@ export async function highlightWhere (
   if (!state.layer) {
     state.layer = new GraphicsLayer({
       title: 'Município selecionado',
-      listMode: 'hide'
+      listMode: 'hide',
+      legendEnabled: false
     })
     view.map.add(state.layer)
+  } else {
+    try { state.layer.listMode = 'hide' } catch (_) {}
+    try { state.layer.legendEnabled = false } catch (_) {}
+    state.layer.visible = true
+    const layers = view.map?.layers
+    const alreadyOnMap = typeof layers?.includes === 'function'
+      ? layers.includes(state.layer)
+      : (layers?.toArray?.() || []).includes(state.layer)
+    if (!alreadyOnMap) view.map.add(state.layer)
   }
   try {
     const top = Math.max(0, (view.map?.layers?.length || 1) - 1)
@@ -1216,6 +1426,7 @@ export function enableMunicipioCustomPopup (
     isSetorLayer?: (layer: any) => boolean
     onSetorHit?: (layer: any, graphic: any) => boolean | void | Promise<boolean | void>
     isSetorSelected?: () => boolean
+    highlightOnSelect?: boolean
   }
 ): MunicipioClickHandle {
   if (!view) return { remove: () => {} }
@@ -1255,7 +1466,10 @@ export function enableMunicipioCustomPopup (
       else if (options.webMap) opts.include = options.webMap.allLayers
 
       const hit = activeLayer ? await view.hitTest(event, opts) : hitAll
-      const found = await extractMunicipioFromHit(hit, activeLayer)
+      let found = await extractMunicipioFromHit(hit, activeLayer)
+      if (!found && activeLayer && !options.compact) {
+        found = await extractMunicipioFromHit(hitAll, activeLayer)
+      }
       if (!found) {
         options.onClose()
         if (options.isAssetSelected?.() || options.isSetorSelected?.()) options.onAssetDeselect?.()
@@ -1298,16 +1512,18 @@ export function enableMunicipioCustomPopup (
       const sameGraphic = selectedMunByView.get(view) === key
       const sameName = Boolean(data?.nome && options.isSelected?.(data.nome))
       if (sameGraphic || sameName) {
-        selectedMunByView.delete(view)
         options.onClose()
         if (options.onDeselect) options.onDeselect()
         else void resetMunicipioView(view)
         return
       }
       selectedMunByView.set(view, key)
+      munZoomByView.set(view, true)
       if (oid != null && Number.isFinite(Number(oid))) {
         const where = `${sqlIdentSafe(oidField)} = ${Number(oid)}`
-        void highlightWhere(view, found.layer, where, { outlineOnly: true })
+        if (options.highlightOnSelect !== false) {
+          void highlightWhere(view, found.layer, where, { outlineOnly: true, maxFeatures: 1 })
+        }
         void zoomToWhere(view, found.layer, where)
       }
       options.onOpen(data, clientX, clientY)

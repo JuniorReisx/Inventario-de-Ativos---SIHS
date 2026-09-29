@@ -442,56 +442,51 @@ async function paintLegendOnMap (
   mapW: number,
   mapH: number
 ): Promise<void> {
-  const visible = groups.filter((group) => group.items?.length)
-  if (!visible.length) return
-
-  const boxW = Math.min(268, Math.max(180, mapW * 0.3))
-  const inner = 10
-  const rowH = 18
-  const groupTitleH = 16
-  let contentH = 20
-  for (const group of visible) {
-    if (group.title) contentH += groupTitleH
-    contentH += group.items.length * rowH + 6
+  const rows: Array<{ title?: string, item?: RelatorioLegendItem }> = []
+  for (const group of groups.filter((group) => group.items?.length)) {
+    for (const item of group.items) rows.push({ item })
   }
-  const boxH = Math.min(mapH - 20, contentH + inner * 2)
-  const boxX = mapX + mapW - boxW - 12
-  const boxY = mapY + 12
+  if (!rows.length) return
+
+  const maxItems = 7
+  const shown = rows.slice(0, maxItems)
+  const extra = rows.length - shown.length
+  const boxW = Math.min(176, Math.max(148, mapW * 0.2))
+  const inner = 8
+  const rowH = 15
+  const contentH = 18 + shown.length * rowH + (extra > 0 ? 14 : 4)
+  const boxH = Math.min(mapH * 0.28, contentH + inner)
+  const boxX = mapX + 10
+  const boxY = mapY + mapH - boxH - 10
 
   ctx.save()
-  ctx.fillStyle = 'rgba(255,255,255,0.94)'
-  roundRect(ctx, boxX, boxY, boxW, boxH, 8)
+  ctx.fillStyle = 'rgba(255,255,255,0.82)'
+  roundRect(ctx, boxX, boxY, boxW, boxH, 7)
   ctx.fill()
-  ctx.strokeStyle = 'rgba(28,43,51,0.18)'
+  ctx.strokeStyle = 'rgba(28,43,51,0.14)'
   ctx.lineWidth = 1
   ctx.stroke()
   ctx.beginPath()
-  roundRect(ctx, boxX, boxY, boxW, boxH, 8)
+  roundRect(ctx, boxX, boxY, boxW, boxH, 7)
   ctx.clip()
 
   ctx.fillStyle = colors.header2
-  ctx.font = '700 12px Segoe UI, Arial, sans-serif'
-  ctx.fillText('Legenda', boxX + inner, boxY + 16, boxW - inner * 2)
+  ctx.font = '700 10px Segoe UI, Arial, sans-serif'
+  ctx.fillText('Legenda', boxX + inner, boxY + 14, boxW - inner * 2)
 
-  let y = boxY + 26
-  const maxY = boxY + boxH - 8
-  for (const group of visible) {
-    if (y + 14 > maxY) break
-    if (group.title) {
-      ctx.fillStyle = colors.header
-      ctx.font = '700 11px Segoe UI, Arial, sans-serif'
-      ctx.fillText(group.title, boxX + inner, y + 12, boxW - inner * 2)
-      y += groupTitleH
-    }
-    for (const item of group.items) {
-      if (y + rowH > maxY) break
-      await drawLegendSwatch(ctx, item, boxX + inner, y, 14)
-      ctx.fillStyle = '#2c3d47'
-      ctx.font = '11px Segoe UI, Arial, sans-serif'
-      ctx.fillText(item.label, boxX + inner + 20, y + 11, boxW - inner * 2 - 20)
-      y += rowH
-    }
-    y += 4
+  let y = boxY + 20
+  for (const row of shown) {
+    if (!row.item) continue
+    await drawLegendSwatch(ctx, row.item, boxX + inner, y, 11)
+    ctx.fillStyle = '#2c3d47'
+    ctx.font = '9px Segoe UI, Arial, sans-serif'
+    ctx.fillText(row.item.label, boxX + inner + 16, y + 9, boxW - inner * 2 - 16)
+    y += rowH
+  }
+  if (extra > 0) {
+    ctx.fillStyle = '#5b6b75'
+    ctx.font = '8px Segoe UI, Arial, sans-serif'
+    ctx.fillText(`+${extra} na legenda abaixo`, boxX + inner, y + 10, boxW - inner * 2)
   }
   ctx.restore()
 }
@@ -507,9 +502,10 @@ async function paintMapLegend (
 
   const title = input.mapLegendTitle || 'Legenda do mapa'
   const note = String(input.mapLegendNote || '').trim()
-  const colW = (CONTENT_W - 32) / 2
-  const rowH = 32
-  const sw = 22
+  const colCount = groups.reduce((sum, group) => sum + group.items.length, 0) > 12 ? 3 : 2
+  const colW = (CONTENT_W - 28) / colCount
+  const rowH = 24
+  const sw = 16
 
   ctx().font = '14px Segoe UI, Arial, sans-serif'
   const noteLines = note ? wrapText(ctx(), note, CONTENT_W - 8) : []
@@ -531,8 +527,8 @@ async function paintMapLegend (
   }
 
   for (const group of groups) {
-    const rows = Math.max(1, Math.ceil(group.items.length / 2))
-    const boxH = (group.title ? 28 : 10) + rows * rowH + 14
+    const rows = Math.max(1, Math.ceil(group.items.length / colCount))
+    const boxH = (group.title ? 24 : 8) + rows * rowH + 10
     painter.ensure(boxH + 8)
     ctx().fillStyle = '#f4f7f9'
     roundRect(ctx(), PAD, painter.y, CONTENT_W, boxH, 10)
@@ -546,12 +542,12 @@ async function paintMapLegend (
     }
     for (let index = 0; index < group.items.length; index++) {
       const item = group.items[index]
-      const col = index % 2
-      const row = Math.floor(index / 2)
-      const x = PAD + 16 + col * colW
+      const col = index % colCount
+      const row = Math.floor(index / colCount)
+      const x = PAD + 12 + col * colW
       const iy = y + row * rowH
       ctx().fillStyle = '#ffffff'
-      roundRect(ctx(), x, iy - 14, sw, sw, 4)
+      roundRect(ctx(), x, iy - 12, sw, sw, 3)
       ctx().fill()
       ctx().strokeStyle = 'rgba(28,43,51,0.16)'
       ctx().lineWidth = 1
@@ -560,13 +556,13 @@ async function paintMapLegend (
       if (item.icon) {
         try {
           const img = await loadImage(item.icon)
-          const max = 18
+          const max = 12
           const ratio = (img.width || 1) / (img.height || 1)
           let dw = max
           let dh = max
           if (ratio > 1) dh = max / ratio
           else dw = max * ratio
-          ctx().drawImage(img, x + (sw - dw) / 2, iy - 14 + (sw - dh) / 2, dw, dh)
+          ctx().drawImage(img, x + (sw - dw) / 2, iy - 12 + (sw - dh) / 2, dw, dh)
           drewIcon = true
         } catch {
           drewIcon = false
@@ -574,12 +570,12 @@ async function paintMapLegend (
       }
       if (!drewIcon) {
         ctx().fillStyle = item.color || '#8aa0ab'
-        roundRect(ctx(), x + 4, iy - 10, 14, 14, 3)
+        roundRect(ctx(), x + 3, iy - 9, 10, 10, 2)
         ctx().fill()
       }
       ctx().fillStyle = '#2c3d47'
-      ctx().font = '14px Segoe UI, Arial, sans-serif'
-      ctx().fillText(item.label, x + sw + 8, iy, colW - sw - 18)
+      ctx().font = '12px Segoe UI, Arial, sans-serif'
+      ctx().fillText(item.label, x + sw + 6, iy, colW - sw - 14)
     }
     painter.y += boxH + 10
   }
@@ -702,9 +698,9 @@ export async function downloadRelatorioPdf (input: RelatorioPdfInput): Promise<v
       const legendGroups = (input.mapLegend || []).filter((group) => group.items?.length)
       if (legendGroups.length) {
         await paintLegendOnMap(ctx(), colors, legendGroups, dx, painter.y, drawW, drawH)
-        legendOnMap = true
       }
       painter.y += drawH + (compact ? 14 : 24)
+      legendOnMap = false
     } catch (_) {
       painter.ensure(32)
       ctx().fillStyle = '#8aa0ab'

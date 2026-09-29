@@ -57,7 +57,7 @@ const ConteudoSobre = ({ folderUrl }: { folderUrl: string }) => {
         <p className="sobre-lead">
           Esta aplicação faz parte do Portal da Água, da Secretaria de Infraestrutura
           Hídrica e Saneamento (SIHS).           Ela coloca no mesmo recorte territorial o inventário de
-          reservatórios, sistemas de abastecimento e poços e os indicadores de
+          barragens, sistemas de abastecimento e poços e os indicadores de
           como a população da Bahia se abastece e esgota.
         </p>
       </section>
@@ -67,7 +67,7 @@ const ConteudoSobre = ({ folderUrl }: { folderUrl: string }) => {
           <p className="sobre-kicker">Navegação</p>
           <h2>O que cada módulo mostra</h2>
           <p>
-            O header leva a cinco telas. Infraestrutura mostra reservatórios, sistemas e poços; água e esgoto
+            O header leva a cinco telas. Infraestrutura mostra barragens, sistemas e poços; água e esgoto
             falam de domicílios; o Atlas fala de mapas.
           </p>
         </header>

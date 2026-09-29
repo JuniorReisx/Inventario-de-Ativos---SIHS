@@ -8,6 +8,7 @@ import {
   highlightWhere,
   resetMunicipioView,
   resizeMapView,
+  setSelectedMunicipioKey,
   setupAuthentication,
   zoomToWhere,
   type MunicipioPopupData
@@ -25,11 +26,13 @@ import {
   resolveActiveSistemasLayer,
   searchMunicipiosSistemas,
   selectExclusiveSistemasLayer,
+  stripMunicipioSelectionOverlays,
   type ClassMapConfig,
   type MunicipioSistema,
   type SistemaLayerItem
 } from '../../lib/sistemas'
 import { loadLayerLegendInView, type AssetLegendGroup } from '../../lib/legend'
+import MapLegend from '../map-legend'
 import PortalLoader from '../portal-loader'
 import './style.css'
 
@@ -65,7 +68,7 @@ function ClassMapPanel (props: {
   const munPopupHandleRef = useRef<{ remove: () => void } | null>(null)
   const munPopupRef = useRef<HTMLDivElement>(null)
   const rankRef = useRef<HTMLElement>(null)
-  const [legendOpen, setLegendOpen] = useState(false)
+  const focusedMunRef = useRef<string | null>(null)
   const [legendBusy, setLegendBusy] = useState(false)
   const [legendGroup, setLegendGroup] = useState<AssetLegendGroup | null>(null)
   const [munPopup, setMunPopup] = useState<{
@@ -78,6 +81,7 @@ function ClassMapPanel (props: {
 
   const closeMunPopup = useCallback(() => {
     void resetMunicipioView(viewRef.current)
+    focusedMunRef.current = null
     setFocusedMun(null)
     setMunPopup({ open: false, data: null })
   }, [])
@@ -123,7 +127,8 @@ function ClassMapPanel (props: {
       ?? hit.feature?.attributes?.objectid
     if (oid != null && Number.isFinite(Number(oid))) {
       const where = `${oidField} = ${Number(oid)}`
-      void highlightWhere(view, hit.layer, where, { outlineOnly: true })
+      setSelectedMunicipioKey(view, `${hit.layer?.id || hit.layer?.title || 'layer'}:${oid}`)
+      void highlightWhere(view, hit.layer, where, { outlineOnly: true, maxFeatures: 1 })
       void zoomToWhere(view, hit.layer, where)
     }
 
@@ -138,6 +143,7 @@ function ClassMapPanel (props: {
         ...(props.config.popupTotalCandidates || [])
       ]
     })
+    focusedMunRef.current = data.nome || wanted
     setFocusedMun(data.nome || wanted)
     openMunPopup(data)
   }, [closeMunPopup, focusedMun, munPopup.open, openMunPopup, props.config])
@@ -190,6 +196,7 @@ function ClassMapPanel (props: {
         }
         viewRef.current = view
         disableNativePopup(view, webMap)
+        stripMunicipioSelectionOverlays(webMap)
         if (mapRef.current) {
           munPopupHandleRef.current?.remove?.()
           munPopupHandleRef.current = enableMunicipioCustomPopup(view, {
@@ -204,10 +211,15 @@ function ClassMapPanel (props: {
             ),
             countLabel: (layer) => popupCountLabel(props.config, layer?.title || ''),
             onOpen: (data) => {
+              focusedMunRef.current = data?.nome || null
               setFocusedMun(data?.nome || null)
               openMunPopup(data)
             },
-            onClose: closeMunPopup
+            onClose: closeMunPopup,
+            isSelected: (name) => {
+              const current = focusedMunRef.current
+              return Boolean(current && name && current.toUpperCase() === name.toUpperCase())
+            }
           })
         }
         await orderTotalSistemasBreaksAscending(webMap, props.config.totalLayerTitles)
@@ -318,7 +330,7 @@ function ClassMapPanel (props: {
   }, [munPopup.open, closeMunPopup])
 
   useEffect(() => {
-    if (!props.active || !legendOpen) return
+    if (!props.active || loading) return
     const view = viewRef.current
     const webMap = webMapRef.current
     if (!view || !webMap) return
@@ -354,7 +366,7 @@ function ClassMapPanel (props: {
       cancelled = true
       handle?.remove?.()
     }
-  }, [props.active, props.config, legendOpen, rankingLayerId, loading])
+  }, [props.active, props.config, rankingLayerId, loading])
 
   const selectLayer = (layer: SistemaLayerItem) => {
     if (layer.id === rankingLayerIdRef.current && layer.visible) return
@@ -508,43 +520,16 @@ function ClassMapPanel (props: {
 
         <div className="infra-sistemas__map-wrap">
           <div className="infra-sistemas__map" ref={mapRef} />
-          <aside className={`infra-sistemas__legend-card${legendOpen ? ' is-open' : ''}`}>
-            <button
-              type="button"
-              onClick={() => setLegendOpen((value) => !value)}
-              aria-expanded={legendOpen}
-            >
-              <span>Legenda</span>
-              <em>{legendOpen ? '−' : '+'}</em>
-            </button>
-            {legendOpen
-              ? (
-                <div className="infra-sistemas__legend">
-                  {legendBusy && !legendGroup
-                    ? <p className="infra-sistemas__legend-empty">Atualizando legenda…</p>
-                    : !legendGroup?.items?.length
-                      ? <p className="infra-sistemas__legend-empty">Nada visível neste recorte</p>
-                      : (
-                        <>
-                          <h4>{layerLabel(legendGroup.title)}</h4>
-                          <ul>
-                            {legendGroup.items.map((item) => (
-                              <li key={item.id}>
-                                <span
-                                  className="infra-sistemas__legend-swatch"
-                                  dangerouslySetInnerHTML={{ __html: item.preview }}
-                                />
-                                <span>{item.label}</span>
-                                <small>{item.count}</small>
-                              </li>
-                            ))}
-                          </ul>
-                        </>
-                        )}
-                </div>
-                )
-              : null}
-          </aside>
+          {!loading && !error
+            ? (
+              <MapLegend
+                place={rankingLayerTitle ? layerLabel(rankingLayerTitle) : props.config.shortLabel}
+                loading={legendBusy}
+                groups={legendGroup ? [legendGroup] : []}
+                totalNoun={props.config.unitPlural}
+              />
+              )
+            : null}
           {loading
             ? (
               <PortalLoader
@@ -563,11 +548,17 @@ function ClassMapPanel (props: {
             : null}
           <div
             ref={munPopupRef}
-            className="mun-popup"
-            hidden={!munPopup.open}
-            role="complementary"
-            aria-label={munPopup.data?.nome ? `Município — ${munPopup.data.nome}` : 'Ficha do município'}
+            className="mun-popup-dock"
+            onPointerDown={(event) => event.stopPropagation()}
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
           >
+            <div
+              className={`mun-popup${munPopup.open ? ' is-open' : ''}`}
+              hidden={!munPopup.open}
+              role="complementary"
+              aria-label={munPopup.data?.nome ? `Município — ${munPopup.data.nome}` : 'Ficha do município'}
+            >
             <div className="mun-popup__card">
               {munPopup.data?.nome ? (
                 <>
@@ -607,6 +598,7 @@ function ClassMapPanel (props: {
                   </dl>
                 </>
               ) : null}
+            </div>
             </div>
           </div>
         </div>

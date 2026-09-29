@@ -209,11 +209,12 @@ export function setTerritorialLayerFocus (
     return { semi, ti, mun, limite }
   }
 
+  // Com recorte (TI, município ou semiárido) a camada de TI não desenha nem consulta.
   showLayer(semi, focus === 'semiarido', webMap)
-  showLayer(ti, focus === 'territorio', webMap)
+  showLayer(ti, false, webMap)
+  restoreLayerDefinition(ti)
   showLayer(mun, focus === 'municipio' || focus === 'semiarido' || focus === 'territorio', webMap)
-  showLayer(limite, focus !== 'territorio' && (limite ? limite.__sihsOrigVisible !== false : false), webMap)
-  if (focus !== 'territorio') restoreLayerDefinition(ti)
+  showLayer(limite, limite ? limite.__sihsOrigVisible !== false : false, webMap)
   return { semi, ti, mun, limite }
 }
 

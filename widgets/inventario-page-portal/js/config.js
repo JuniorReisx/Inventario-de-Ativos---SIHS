@@ -70,12 +70,12 @@ export const HEADER_INDICATORS = [
   },
   {
     id: "reservatorios",
-    label: "Reservatórios",
+    label: "Barragens",
     layerTitle: "Reservatórios Tratado",
     statisticType: "count",
     icon: "reservatorios",
     popup: {
-      title: "Tipos de Reservatórios",
+      title: "Tipos de Barragens",
       mode: "types",
       field: "uso_princ",
       source: "SNISB-ANA"

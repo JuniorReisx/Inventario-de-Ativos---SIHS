@@ -8,10 +8,18 @@ export default function AtivoPopup (props: {
   loading: boolean
   error?: string
   rows: PopupRow[]
+  onClose?: () => void
 }) {
   if (props.loading) {
     return (
       <div className="infra-ativo-popup" role="status">
+        {props.onClose
+          ? (
+            <button type="button" className="infra-ativo-popup__close" aria-label="Desmarcar ativo" onClick={props.onClose}>
+              ×
+            </button>
+            )
+          : null}
         <PortalLoader folderUrl={props.folderUrl} compact label="Carregando detalhes" />
       </div>
     )
@@ -20,6 +28,13 @@ export default function AtivoPopup (props: {
   if (props.error) {
     return (
       <div className="infra-ativo-popup" role="status">
+        {props.onClose
+          ? (
+            <button type="button" className="infra-ativo-popup__close" aria-label="Desmarcar ativo" onClick={props.onClose}>
+              ×
+            </button>
+            )
+          : null}
         <p className="infra-ativo-popup__status">{props.error}</p>
       </div>
     )
@@ -27,6 +42,13 @@ export default function AtivoPopup (props: {
 
   return (
     <div className="infra-ativo-popup">
+      {props.onClose
+        ? (
+          <button type="button" className="infra-ativo-popup__close" aria-label="Desmarcar ativo" onClick={props.onClose}>
+            ×
+          </button>
+          )
+        : null}
       {props.title
         ? <p className="infra-ativo-popup__title">{props.title}</p>
         : null}

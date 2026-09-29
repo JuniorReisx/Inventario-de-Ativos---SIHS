@@ -281,7 +281,7 @@ const HeroPortal = () => {
             Portal da Água
           </p>
           <p className="hero-portal__text">
-            Consulte e explore informações sobre reservatórios,
+            Consulte e explore informações sobre barragens,
             sistemas e poços do Estado da Bahia.
           </p>
         </div>

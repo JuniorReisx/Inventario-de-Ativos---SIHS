@@ -352,7 +352,7 @@ function normalizeLayerName (value: string): string {
 
 export function atlasDisplayTitle (title: string): string {
   const name = normalizeLayerName(title)
-  if (name.includes('reservator') && name.includes('snisb')) return 'Reservatórios'
+  if (name.includes('reservator') && name.includes('snisb')) return 'Barragens'
   if (name.includes('pdaindicadorescenso') || name.includes('dpaindicadorescenso')) return 'Municípios'
   if (name.includes('semiarid')) return 'Região Semiárida'
   if (name.includes('limite') && name.includes('bahia')) return 'Bahia'

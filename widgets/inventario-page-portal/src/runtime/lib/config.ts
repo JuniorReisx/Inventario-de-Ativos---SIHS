@@ -130,7 +130,7 @@ export const HEADER_INDICATORS: IndicatorDefinition[] = [
   },
   {
     id: 'reservatorios',
-    label: 'Reservatórios',
+    label: 'Barragens',
     layerTitle: 'Reservatórios',
     statisticType: 'count',
     icon: 'reservatorios',

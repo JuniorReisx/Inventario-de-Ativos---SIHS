@@ -188,6 +188,32 @@
   font-weight: 600;
 }
 
+.infra-chart__source {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.5rem 0.9rem 0.65rem;
+  border-top: 1px solid rgba(209, 220, 228, 0.95);
+  color: #5d7380;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+}
+
+.infra-chart__source > span:first-child {
+  flex: 0 0 1.75rem;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #1aa8c8, rgba(26, 168, 200, 0.15));
+}
+
+.infra-chart__source strong {
+  color: #0a5c66;
+  font-weight: 800;
+}
+
 @media (max-width: 1100px) {
   .infra-charts {
     grid-template-columns: 1fr;
@@ -213,6 +239,45 @@
   overflow: hidden;
   border: 1px solid rgba(183, 196, 207, 0.9);
   background: linear-gradient(180deg, #e8eef3, #d7e2ea);
+}
+
+.infra-cursor-coords {
+  position: absolute;
+  right: 0.7rem;
+  bottom: 2.1rem;
+  z-index: 4;
+  pointer-events: none;
+  min-width: 9.5rem;
+  padding: 0.38rem 0.55rem;
+  border-radius: 10px;
+  background: rgba(0, 24, 36, 0.72);
+  border: 1px solid rgba(0, 34, 49, 0.28);
+  box-shadow: 0 4px 12px rgba(0, 33, 59, 0.18);
+  color: #fff;
+  font-family: "IBM Plex Mono", monospace;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.infra-cursor-coords.is-on {
+  opacity: 1;
+}
+
+.infra-cursor-coords__dms {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.infra-cursor-coords__dec {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.58rem;
+  font-weight: 600;
+  color: #c5dbe4;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .infra-mun {
@@ -370,6 +435,99 @@
 
 .infra-mun__filters .infra-mun__clear {
   margin: 0;
+}
+
+.infra-mun__coord-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: stretch;
+}
+
+.infra-mun__coord-row input {
+  flex: 1;
+}
+
+.infra-mun__coord-go {
+  flex: 0 0 auto;
+  padding: 0 0.7rem;
+  border: 1px solid rgba(26, 168, 200, 0.45);
+  border-radius: 8px;
+  background: #0a5c66;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.infra-mun__coord-hint,
+.infra-mun__coord-error {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.infra-mun__coord-error {
+  color: #9b2c2c;
+}
+
+.infra-mun__radius {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.infra-mun__radius input[type='range'] {
+  width: 100%;
+  height: 6px;
+  accent-color: #0a5c66;
+}
+
+.infra-mun__radius-scale {
+  display: flex;
+  justify-content: space-between;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #5d7380;
+}
+
+.coord-popup__card .mun-popup__grid {
+  grid-template-columns: 1fr;
+}
+
+.coord-popup__card .mun-popup__title {
+  font-size: 1.02rem;
+  word-break: break-word;
+}
+
+.coord-popup__note {
+  margin: 0.75rem 0 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  background: rgba(26, 168, 200, 0.1);
+  color: #0a5c66;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.coord-popup__note strong {
+  font-weight: 800;
 }
 
 .infra-mun__semi-toggle {
@@ -578,13 +736,44 @@
   color: var(--muted);
 }
 
+.infra-mun__row--coord span {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.infra-mun__row--coord small {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
 .infra-ativo-popup {
+  position: relative;
   margin: -0.15rem 0 0.55rem;
   padding: 0.65rem 0.7rem 0.55rem;
   border: 1px solid rgba(26, 168, 200, 0.35);
   border-radius: 0 0 10px 10px;
   background: #fff;
   box-shadow: inset 3px 0 0 var(--cyan);
+}
+
+.infra-ativo-popup__close {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.4rem;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .infra-ativo-popup:has(.portal-loader-infra) {
@@ -596,7 +785,7 @@
 
 .infra-ativo-popup__title,
 .infra-ativo-popup__status {
-  margin: 0 0 0.45rem;
+  margin: 0 1.6rem 0.45rem 0;
   color: var(--muted);
   font-size: 0.7rem;
   font-weight: 700;

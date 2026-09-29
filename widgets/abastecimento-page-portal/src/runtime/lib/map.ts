@@ -220,14 +220,16 @@ function pickAttrValue (attrs: Record<string, any> | null | undefined, candidate
 
 function formatSetorValue (layer: any, fieldHint: string, raw: any): string {
   if (raw == null || raw === '') return '—'
-  try {
-    const field = (layer?.fields || []).find((item: any) => normalizeText(item?.name || '') === normalizeText(fieldHint))
-    const coded = field?.domain?.codedValues as Array<{ code: any, name: string }> | undefined
-    const match = coded?.find((item) => String(item.code) === String(raw))
-    if (match?.name) return match.name
-  } catch (_) {}
   const hint = normalizeText(fieldHint)
   const asCode = hint.includes('setor') || hint.includes('aglom') || hint.includes('codigo') || hint.startsWith('cd')
+  if (!asCode) {
+    try {
+      const field = (layer?.fields || []).find((item: any) => normalizeText(item?.name || '') === normalizeText(fieldHint))
+      const coded = field?.domain?.codedValues as Array<{ code: any, name: string }> | undefined
+      const match = coded?.find((item) => String(item.code) === String(raw))
+      if (match?.name) return match.name
+    } catch (_) {}
+  }
   const integerCode = (n: number) => Math.round(n).toLocaleString('en-US', { useGrouping: false, maximumFractionDigits: 0 })
   if (typeof raw === 'number' && Number.isFinite(raw)) {
     if (asCode || Math.abs(raw) >= 1e10) return integerCode(raw)
@@ -251,7 +253,7 @@ function setorPopupSpecs (theme: 'agua' | 'esgoto'): SetorPopupSpec[] {
     { label: 'Tipo de setor', candidates: ['nm_tipo', 'tipo_sc', 'tipo_setor', 'tipo'] },
     { label: 'Distrito', candidates: ['nm_dist', 'nm_distrito', 'distrito'] },
     { label: 'Aglomerado', candidates: ['nm_aglom', 'nome_aglomerado', 'aglomerado'] },
-    { label: 'Código do aglomerado', candidates: ['cd_aglom', 'cd_aglomerado', 'codigo_aglomerado', 'codigo_do_aglomerado'] },
+    { label: 'Código', candidates: ['cd_setor', 'codigo_do_setor', 'cd_aglom', 'cd_aglomerado', 'codigo_aglomerado', 'codigo_do_aglomerado'] },
     { label: 'População', candidates: ['v0001', 'populacao', 'pop'] },
     { label: 'Domicílios', candidates: ['v0002', 'domicilios', 'total_domicilios'] }
   ]
@@ -1114,7 +1116,7 @@ export function createMapApi (view: any, layer: any, options: {
       if (raw == null) return []
       return [{ label: spec.label, value: formatSetorValue(sl, spec.candidates[0], raw) }]
     })
-    const title = code != null && String(code).trim() ? String(code) : 'Setor censitário'
+    const title = code != null && String(code).trim() ? formatSetorValue(sl, 'cd_setor', code) : 'Setor censitário'
     const eyebrow = munName != null ? `<p class="setor-popup__eyebrow">${String(munName)}</p>` : ''
     el.innerHTML = `
       <div class="setor-popup__card">

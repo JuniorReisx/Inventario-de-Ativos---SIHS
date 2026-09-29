@@ -1,6 +1,5 @@
 import { React, type AllWidgetProps } from 'jimu-core'
 import AtlasMap from './components/atlas-map'
-import KaioChat from './components/kaio-chat'
 import './style.css'
 
 const Widget = (props: AllWidgetProps<any>) => {
@@ -9,7 +8,6 @@ const Widget = (props: AllWidgetProps<any>) => {
       <div className="atlas-page__stage">
         <AtlasMap folderUrl={props.context.folderUrl} />
       </div>
-      <KaioChat folderUrl={props.context.folderUrl} />
     </div>
   )
 }

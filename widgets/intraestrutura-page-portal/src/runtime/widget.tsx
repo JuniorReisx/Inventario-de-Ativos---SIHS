@@ -11,12 +11,15 @@ import {
   queryFirstGeometry,
   queryUnionGeometry,
   highlightWhere,
+  highlightGeometry,
   clearHighlight,
   enableMunicipioCustomPopup,
   disableNativePopup,
+  zoomToCoordRadius,
+  clearCoordMarker,
   type MunicipioPopupData
 } from './lib/map'
-import { findLayer, findMunicipioLayer, findTerritorioLayer, setLayerDefinition, setTerritorialLayerFocus, territorioLayerWhere } from './lib/layers'
+import { findLayer, findMunicipioLayer, findTerritorioLayer, setTerritorialLayerFocus, territorioLayerWhere } from './lib/layers'
 import {
   PAGE_SIZE,
   loadMunicipios,
@@ -26,7 +29,8 @@ import {
   normalizeMunName,
   type MunicipioItem
 } from './lib/municipios'
-import { applyInfraGeometryFilter, applyInfraLayerScope, emptyCharts, groupSmallChartSlices, layerScopeWhere, loadInfraCharts, type InfraChart } from './lib/charts'
+import { formatCoordLabel, parseGeoCoordinate } from './lib/coords'
+import { applyInfraGeometryFilter, applyInfraLayerScope, chartFilterWhere, emptyCharts, groupSmallChartSlices, layerScopeWhere, loadInfraCharts, type ChartMapFilter, type InfraChart } from './lib/charts'
 import {
   ASSET_DEFS,
   ASSET_PAGE_SIZE,
@@ -57,7 +61,6 @@ import SistemasMap from './components/sistemas-map'
 import AtivoPopup from './components/ativo-popup'
 import MapLegend from './components/map-legend'
 import PortalLoader from './components/portal-loader'
-import KaioChat from './components/kaio-chat'
 import { loadPopupRows, popupFieldsForAsset, type PopupRow } from './lib/popup'
 import { captureMapView, downloadRelatorioPdf, slugRelatorio } from './lib/relatorio-pdf'
 import './style.css'
@@ -79,6 +82,9 @@ function popupDataFromMunicipio (item: MunicipioItem): MunicipioPopupData {
     extraFields: []
   }
 }
+
+const COORD_RADIUS_MIN_KM = 1
+const COORD_RADIUS_MAX_KM = 100
 
 const { useCallback, useEffect, useMemo, useRef, useState } = React
 
@@ -171,6 +177,15 @@ function AtivosList (props: {
                 <em>Município</em>
                 {item.municipality}
               </span>
+              <span className="infra-mun__row infra-mun__row--coord">
+                <em>Coordenada</em>
+                <span>
+                  {item.coordDms || '—'}
+                  {item.coordDecimal
+                    ? <small>{item.coordDecimal}</small>
+                    : null}
+                </span>
+              </span>
             </button>
             {props.selectedKey === item.key
               ? (
@@ -180,6 +195,7 @@ function AtivosList (props: {
                   loading={!props.popup || props.popup.loading}
                   error={props.popup?.error}
                   rows={props.popup?.rows || []}
+                  onClose={() => props.onSelect(item)}
                 />
                 )
               : null}
@@ -342,6 +358,20 @@ const Widget = (props: AllWidgetProps<any>) => {
   const [filterTerritorio, setFilterTerritorio] = useState('')
   const [semiRegionOn, setSemiRegionOn] = useState(false)
   const [munQuery, setMunQuery] = useState('')
+  const [coordQuery, setCoordQuery] = useState('')
+  const [coordError, setCoordError] = useState('')
+  const [coordHit, setCoordHit] = useState<{
+    open: boolean
+    lat: number
+    lon: number
+    label: string
+    radiusKm: number | null
+  } | null>(null)
+  const coordBufferRef = useRef<any>(null)
+  const [coordBufferEpoch, setCoordBufferEpoch] = useState(0)
+  const radiusTimerRef = useRef(0)
+  const radiusRequestRef = useRef(0)
+  const [radiusDraft, setRadiusDraft] = useState(COORD_RADIUS_MIN_KM)
   const [listTab, setListTab] = useState<'municipios' | 'ativos' | 'setores'>('municipios')
   const [assetType, setAssetType] = useState<AssetType>('')
   assetTypeRef.current = assetType
@@ -369,6 +399,10 @@ const Widget = (props: AllWidgetProps<any>) => {
     pocos: 'condicao',
     sistemas: 'tipo'
   })
+  const [chartFilter, setChartFilter] = useState<ChartMapFilter | null>(null)
+  const chartFilterRef = useRef<ChartMapFilter | null>(null)
+  const chartFilterReadyRef = useRef(false)
+  chartFilterRef.current = chartFilter
   const [munPopup, setMunPopup] = useState<{
     open: boolean
     data: MunicipioPopupData | null
@@ -400,6 +434,10 @@ const Widget = (props: AllWidgetProps<any>) => {
       ...prev,
       open: false
     }))
+  }, [])
+
+  const closeCoordPopup = useCallback(() => {
+    setCoordHit((prev) => (prev ? { ...prev, open: false } : prev))
   }, [])
 
   const clearMunPopup = useCallback(() => {
@@ -654,9 +692,10 @@ const Widget = (props: AllWidgetProps<any>) => {
     () => territorialMunicipios.map((item) => item.name),
     [territorialMunicipios]
   )
-  const scoped = Boolean(selectedName || filterTerritorio || semiRegionOn)
+  const hasCoordZone = Boolean(coordHit?.radiusKm && coordBufferEpoch > 0)
+  const scoped = Boolean(selectedName || filterTerritorio || semiRegionOn || hasCoordZone)
   const filterSemiarido = semiRegionOn ? 'SIM' : ''
-  const territorialKey = `${selectedName || ''}|${filterTerritorio}|${filterSemiarido}|${filteredNames.join(',')}`
+  const territorialKey = `${selectedName || ''}|${filterTerritorio}|${filterSemiarido}|${filteredNames.join(',')}|${hasCoordZone ? `${coordHit?.lat},${coordHit?.lon},${coordHit?.radiusKm},${coordBufferEpoch}` : ''}`
   const lastTerritorialRef = useRef('')
 
   useEffect(() => {
@@ -688,7 +727,9 @@ const Widget = (props: AllWidgetProps<any>) => {
       assetType,
       searchText: assetSearch,
       setorSearch,
-      setorTipo
+      setorTipo,
+      geometry: hasCoordZone ? coordBufferRef.current : null,
+      chartFilter: chartFilterRef.current
     }
     const reloadCharts = lastTerritorialRef.current !== territorialKey
     if (reloadCharts) {
@@ -707,6 +748,9 @@ const Widget = (props: AllWidgetProps<any>) => {
       } else {
         await applyInfraLayerScope(webMap, scope)
       }
+      if (hasCoordZone && coordBufferRef.current) {
+        await applyInfraGeometryFilter(viewRef.current, webMap, coordBufferRef.current)
+      }
       if (!cancelled) setLegendLoading(true)
       try {
         const nextLegend = await loadAssetLegend(webMap, (layer) => layerScopeWhere(layer, {
@@ -714,7 +758,8 @@ const Widget = (props: AllWidgetProps<any>) => {
           filterTerritorio,
           filterSemiarido,
           filteredNames,
-          scoped
+          scoped,
+          geometry: hasCoordZone ? coordBufferRef.current : null
         }))
         if (!cancelled) setLegend(nextLegend)
       } catch (err) {
@@ -729,13 +774,34 @@ const Widget = (props: AllWidgetProps<any>) => {
     return () => {
       cancelled = true
     }
-  }, [loading, selectedName, filterTerritorio, filterSemiarido, filteredNames, assetType, assetSearch, setorSearch, setorTipo, territorialKey])
+  }, [loading, selectedName, filterTerritorio, filterSemiarido, filteredNames, assetType, assetSearch, setorSearch, setorTipo, territorialKey, hasCoordZone])
+
+  useEffect(() => {
+    if (!chartFilterReadyRef.current) {
+      chartFilterReadyRef.current = true
+      return
+    }
+    const webMap = webMapRef.current
+    if (!webMap || loading) return
+    void applyInfraLayerScope(webMap, {
+      selectedName,
+      filterTerritorio,
+      filterSemiarido,
+      filteredNames,
+      assetType,
+      searchText: assetSearch,
+      setorSearch,
+      setorTipo,
+      geometry: coordBufferRef.current,
+      chartFilter
+    })
+  }, [chartFilter])
 
   useEffect(() => {
     const webMap = webMapRef.current
     if (!webMap || loading) return
 
-    if (assetSearch.length < 2 && !selectedName && !filterTerritorio) {
+    if (assetSearch.length < 2 && !selectedName && !filterTerritorio && !hasCoordZone && !chartFilter) {
       setAtivos(withPinnedAtivo([], pinnedAtivoRef.current))
       setAtivosLoading(false)
       return
@@ -748,16 +814,24 @@ const Widget = (props: AllWidgetProps<any>) => {
       try {
         const items = await searchAtivos(webMap, {
           searchText: assetSearch,
-          assetType,
+          assetType: chartFilter?.chartId ? chartFilter.chartId as AssetType : assetType,
           selectedName,
-          territorialScope: Boolean(filterTerritorio),
-          territorialWhere: (layer) => layerScopeWhere(layer, {
-            selectedName,
-            filterTerritorio,
-            filterSemiarido,
-            filteredNames,
-            scoped
-          })
+          territorialScope: Boolean(filterTerritorio || hasCoordZone || chartFilter),
+          geometry: hasCoordZone ? coordBufferRef.current : null,
+          territorialWhere: (layer) => {
+            const territorial = layerScopeWhere(layer, {
+              selectedName,
+              filterTerritorio,
+              filterSemiarido,
+              filteredNames,
+              scoped,
+              geometry: hasCoordZone ? coordBufferRef.current : null
+            })
+            const slice = chartFilterWhere(layer, chartFilter)
+            if (!slice) return territorial
+            if (!territorial || territorial === '1=1') return slice
+            return `(${territorial}) AND (${slice})`
+          }
         })
         if (!cancelled) setAtivos(withPinnedAtivo(items, pinnedAtivoRef.current))
       } catch (err) {
@@ -772,13 +846,13 @@ const Widget = (props: AllWidgetProps<any>) => {
     return () => {
       cancelled = true
     }
-  }, [loading, assetSearch, assetType, selectedName, filterTerritorio, filterSemiarido, filteredNames, scoped])
+  }, [loading, assetSearch, assetType, selectedName, filterTerritorio, filterSemiarido, filteredNames, scoped, hasCoordZone, coordBufferEpoch, chartFilter])
 
   useEffect(() => {
     const webMap = webMapRef.current
     if (!webMap || loading) return
 
-    if (setorSearch.length < 2 && !selectedName && !filterTerritorio) {
+    if (setorSearch.length < 2 && !selectedName && !filterTerritorio && !hasCoordZone) {
       setSetores(withPinnedSetor([], pinnedSetorRef.current))
       setSetoresLoading(false)
       return
@@ -793,13 +867,15 @@ const Widget = (props: AllWidgetProps<any>) => {
           searchText: setorSearch,
           tipo: setorTipo,
           selectedName,
-          territorialScope: Boolean(filterTerritorio),
+          territorialScope: Boolean(filterTerritorio || hasCoordZone),
+          geometry: hasCoordZone ? coordBufferRef.current : null,
           territorialWhere: (layer) => layerScopeWhere(layer, {
             selectedName,
             filterTerritorio,
             filterSemiarido,
             filteredNames,
-            scoped
+            scoped,
+            geometry: hasCoordZone ? coordBufferRef.current : null
           })
         })
         if (!cancelled) setSetores(withPinnedSetor(items, pinnedSetorRef.current))
@@ -815,7 +891,7 @@ const Widget = (props: AllWidgetProps<any>) => {
     return () => {
       cancelled = true
     }
-  }, [loading, setorSearch, setorTipo, selectedName, filterTerritorio, filterSemiarido, filteredNames, scoped])
+  }, [loading, setorSearch, setorTipo, selectedName, filterTerritorio, filterSemiarido, filteredNames, scoped, hasCoordZone, coordBufferEpoch])
 
   const applyScope = useCallback(async (
     selected: string | null,
@@ -831,14 +907,20 @@ const Widget = (props: AllWidgetProps<any>) => {
       assetType,
       searchText: assetSearch,
       setorSearch,
-      setorTipo
+      setorTipo,
+      geometry: coordBufferRef.current,
+      chartFilter
     })
-  }, [filterTerritorio, filterSemiarido, filteredNames, assetType, assetSearch, setorSearch, setorTipo])
+  }, [filterTerritorio, filterSemiarido, filteredNames, assetType, assetSearch, setorSearch, setorTipo, chartFilter])
 
   const focusMunicipio = useCallback(async (name: string) => {
     const view = viewRef.current
     const webMap = webMapRef.current
     if (!view || !webMap) return false
+    coordBufferRef.current = null
+    setCoordBufferEpoch(0)
+    setCoordHit(null)
+    clearCoordMarker(view)
     const layer = findMunicipioLayer(webMap)
     if (!layer) return false
     const where = municipioWhere(name)
@@ -893,6 +975,10 @@ const Widget = (props: AllWidgetProps<any>) => {
     const view = viewRef.current
     const webMap = webMapRef.current
     if (!view || !webMap || !territorio) return false
+    coordBufferRef.current = null
+    setCoordBufferEpoch(0)
+    setCoordHit(null)
+    clearCoordMarker(view)
     const layer = findMunicipioLayer(webMap)
     if (!layer) return false
     const where = territorioWhere(territorio)
@@ -902,19 +988,21 @@ const Widget = (props: AllWidgetProps<any>) => {
     await applyScope(null, { filterTerritorio: territorio, filteredNames: names })
     setSemiRegionOn(false)
     const { ti } = setTerritorialLayerFocus(webMap, 'territorio')
+    let geometry: any = null
     if (ti) {
       try { await ti.load?.() } catch (_) {}
-      setLayerDefinition(ti, territorioLayerWhere(ti, territorio))
+      geometry = await queryFirstGeometry(ti, territorioLayerWhere(ti, territorio))
     }
-    const geometry = await queryUnionGeometry(layer, where)
+    if (!geometry) geometry = await queryUnionGeometry(layer, where)
     scopeGeometryRef.current = geometry
     await applyInfraGeometryFilter(view, webMap, geometry)
-    if (ti) {
-      await highlightWhere(view, ti, territorioLayerWhere(ti, territorio), { outlineOnly: true, maxFeatures: 20 })
+    if (geometry) {
+      await highlightGeometry(view, geometry, { outlineOnly: true })
+      await zoomToGeometry(view, geometry)
     } else {
       clearHighlight(view)
+      await zoomToWhere(view, layer, where)
     }
-    await zoomToWhere(view, ti || layer, ti ? territorioLayerWhere(ti, territorio) : where)
     return true
   }, [applyScope, municipios])
 
@@ -926,6 +1014,15 @@ const Widget = (props: AllWidgetProps<any>) => {
     const territorio = options && 'territorio' in options ? options.territorio : filterTerritorio
     const view = viewRef.current
     const webMap = webMapRef.current
+    if (!municipality && !territorio && coordBufferRef.current && coordHit?.radiusKm) {
+      clearHighlight(view)
+      await applyInfraGeometryFilter(view, webMap, coordBufferRef.current)
+      const extent = coordBufferRef.current.extent
+      if (view && extent) {
+        await zoomToExtent(view, typeof extent.expand === 'function' ? extent.expand(1.2) : extent)
+      }
+      return
+    }
     if (!municipality && !territorio) {
       scopeGeometryRef.current = null
       await applyInfraGeometryFilter(view, webMap, null)
@@ -957,18 +1054,19 @@ const Widget = (props: AllWidgetProps<any>) => {
     if (view && initialExtentRef.current) {
       await zoomToExtent(view, initialExtentRef.current)
     }
-  }, [selectedName, filterTerritorio, focusMunicipio, focusArea, semiRegionOn])
+  }, [selectedName, filterTerritorio, focusMunicipio, focusArea, semiRegionOn, coordHit?.radiusKm])
 
   const deselectAtivoKeepScope = useCallback(async () => {
     const requestId = ++popupRequestRef.current
     pinnedAtivoRef.current = null
+    selectedAtivoKeyRef.current = null
+    selectedSetorKeyRef.current = null
     restoreAssetTypeFilter()
-    if (assetSearch.length < 2 && !selectedNameRef.current && !filterTerritorio) setAtivos([])
+    clearHighlight(viewRef.current)
+    if (assetSearch.length < 2 && !selectedNameRef.current && !filterTerritorio && !coordBufferRef.current) setAtivos([])
     setAssetPopup(null)
     setSelectedAtivoKey(null)
-    selectedAtivoKeyRef.current = null
     setSelectedSetorKey(null)
-    selectedSetorKeyRef.current = null
     pinnedSetorRef.current = null
     setZooming(true)
     try {
@@ -1010,7 +1108,7 @@ const Widget = (props: AllWidgetProps<any>) => {
     const webMap = webMapRef.current
     if (!view || !webMap) return
 
-    if (selectedAtivoKey === item.key) {
+    if (selectedAtivoKeyRef.current === item.key) {
       await deselectAtivoKeepScope()
       return
     }
@@ -1068,10 +1166,21 @@ const Widget = (props: AllWidgetProps<any>) => {
         })
       ])
       if (popupRequestRef.current !== requestId) return
+      let detail = item
+      if (!item.coordDms) {
+        detail = await hydrateAtivo(webMap, item)
+        if (popupRequestRef.current !== requestId) return
+        pinnedAtivoRef.current = detail
+        setAtivos((prev) => withPinnedAtivo(prev, detail))
+      }
+      const coordValue = detail.coordDms
+        ? (detail.coordDecimal ? `${detail.coordDms}  (${detail.coordDecimal})` : detail.coordDms)
+        : ''
       const header = [
-        { label: 'Tipo', value: item.typeLabel },
-        { label: 'Município', value: item.municipality }
-      ].filter((row) => row.value && row.value !== '—')
+        { label: 'Tipo', value: detail.typeLabel },
+        { label: 'Município', value: detail.municipality },
+        { label: 'Coordenada geográfica', value: coordValue || '—' }
+      ].filter((row) => row.label === 'Coordenada geográfica' || (row.value && row.value !== '—'))
       const known = new Set(rows.map((row) => row.label))
       setAssetPopup({
         key: item.key,
@@ -1241,6 +1350,125 @@ const Widget = (props: AllWidgetProps<any>) => {
     }
   }, [selectedName, clearSelection, focusMunicipio, closeAssetPopup, deselectAtivoKeepScope])
 
+  const applyNearbyRadius = useCallback(async (
+    km: number,
+    hit = coordHit,
+    options?: { live?: boolean }
+  ) => {
+    const view = viewRef.current
+    const webMap = webMapRef.current
+    if (!hit || !view || !webMap) return
+
+    const radius = Math.min(COORD_RADIUS_MAX_KM, Math.max(COORD_RADIUS_MIN_KM, Math.round(km)))
+    const requestId = ++radiusRequestRef.current
+    selectedNameRef.current = null
+    setSelectedName(null)
+    clearMunPopup()
+    closeAssetPopup()
+    setFilterTerritorio('')
+    setSemiRegionOn(false)
+    setTerritorialLayerFocus(webMap, 'municipio')
+    if (!options?.live) {
+      pinnedAtivoRef.current = null
+      setAtivos([])
+      setSetores([])
+    }
+    if (!coordBufferRef.current) {
+      setListTab('ativos')
+      setPage(0)
+    }
+    if (!options?.live) setZooming(true)
+    try {
+      const geometry = await zoomToCoordRadius(view, hit.lon, hit.lat, radius, {
+        duration: options?.live ? 0 : 700,
+        fit: !options?.live
+      })
+      if (requestId !== radiusRequestRef.current) return
+      if (!geometry) {
+        setCoordError('Não foi possível desenhar esse raio no mapa.')
+        return
+      }
+      coordBufferRef.current = geometry
+      setCoordBufferEpoch((value) => value + 1)
+      scopeGeometryRef.current = geometry
+      await applyInfraGeometryFilter(view, webMap, geometry)
+      if (requestId !== radiusRequestRef.current) return
+      await applyScope(null, { filterTerritorio: '', filteredNames: [] })
+      if (requestId !== radiusRequestRef.current) return
+      setCoordHit({ ...hit, open: true, radiusKm: radius })
+      setRadiusDraft(radius)
+    } catch (err) {
+      if (requestId !== radiusRequestRef.current) return
+      console.error('[infra-page] Falha ao aplicar raio da coordenada:', err)
+      setCoordError('Não foi possível visualizar a infraestrutura nesse raio.')
+    } finally {
+      if (requestId === radiusRequestRef.current && !options?.live) setZooming(false)
+    }
+  }, [coordHit, clearMunPopup, closeAssetPopup, applyScope])
+
+  const scheduleNearbyRadius = useCallback((km: number) => {
+    const radius = Math.min(COORD_RADIUS_MAX_KM, Math.max(COORD_RADIUS_MIN_KM, Number(km) || COORD_RADIUS_MIN_KM))
+    setRadiusDraft(radius)
+    window.clearTimeout(radiusTimerRef.current)
+    radiusTimerRef.current = window.setTimeout(() => {
+      void applyNearbyRadius(radius, coordHit, { live: true })
+    }, 160)
+  }, [applyNearbyRadius, coordHit])
+
+  const goToCoordinate = useCallback(async (raw?: string) => {
+    const query = typeof raw === 'string' ? raw : coordQuery
+    const parsed = parseGeoCoordinate(query)
+    if (!parsed) {
+      setCoordError(query.trim()
+        ? 'Coordenada inválida. Use graus, minutos e segundos ou decimal.'
+        : '')
+      return
+    }
+
+    const view = viewRef.current
+    if (!view) {
+      setCoordError('O mapa ainda está carregando.')
+      return
+    }
+
+    setCoordError('')
+    closeMunPopup()
+    closeAssetPopup()
+    selectedNameRef.current = null
+    setSelectedName(null)
+    clearMunPopup()
+    pinnedAtivoRef.current = null
+    pinnedSetorRef.current = null
+    setSelectedAtivoKey(null)
+    selectedAtivoKeyRef.current = null
+    setSelectedSetorKey(null)
+    selectedSetorKeyRef.current = null
+    setAtivos([])
+    setSetores([])
+    coordBufferRef.current = null
+    setCoordBufferEpoch(0)
+    const hit = {
+      open: true,
+      lat: parsed.lat,
+      lon: parsed.lon,
+      label: formatCoordLabel(parsed),
+      radiusKm: null as number | null
+    }
+    setCoordHit(hit)
+    setRadiusDraft(COORD_RADIUS_MIN_KM)
+    setZooming(true)
+    try {
+      await applyScope(null, { filterTerritorio: filterTerritorio || '', filteredNames })
+      await applyInfraGeometryFilter(view, webMapRef.current, null)
+      await applyNearbyRadius(COORD_RADIUS_MIN_KM, hit)
+    } catch (err) {
+      console.error('[infra-page] Falha ao ir até a coordenada:', err)
+      setCoordError('Não foi possível ir até essa coordenada.')
+    } finally {
+      setZooming(false)
+    }
+  }, [coordQuery, closeMunPopup, closeAssetPopup, clearMunPopup, applyScope, filterTerritorio, filteredNames, applyNearbyRadius])
+
   selectMunFromMapRef.current = (name: string) => {
     const wanted = normalizeMunName(name)
     if (!wanted) return
@@ -1264,11 +1492,14 @@ const Widget = (props: AllWidgetProps<any>) => {
   }
 
   const scopeLabel = useMemo(() => {
+    if (hasCoordZone && coordHit) {
+      return `Coordenada geográfica — raio de ${coordHit.radiusKm} km`
+    }
     if (selectedName) return `Município — ${selectedName}`
     if (filterTerritorio) return `Território de Identidade — ${filterTerritorio}`
     if (semiRegionOn) return 'Região Semiárida'
     return `Estado da Bahia — ${municipios.length} municípios`
-  }, [selectedName, filterTerritorio, semiRegionOn, municipios.length])
+  }, [hasCoordZone, coordHit, selectedName, filterTerritorio, semiRegionOn, municipios.length])
 
   const exportPdf = useCallback(async () => {
     if (exporting || loading) return
@@ -1278,6 +1509,7 @@ const Widget = (props: AllWidgetProps<any>) => {
     }
     setExporting(true)
     try {
+      const coordGeometry = hasCoordZone ? coordBufferRef.current : null
       const scoped = selectedName
         ? municipios.filter((item) => item.name === selectedName)
         : territorialMunicipios
@@ -1285,14 +1517,16 @@ const Widget = (props: AllWidgetProps<any>) => {
       const listLimit = selectedName ? 18 : 80
       const assetLists = webMap
         ? await listAtivosRelatorio(webMap, {
-            selectedName,
+            selectedName: coordGeometry ? null : selectedName,
+            geometry: coordGeometry,
             maxPerKind: listLimit,
             territorialWhere: (layer) => layerScopeWhere(layer, {
-              selectedName,
-              filterTerritorio,
-              filterSemiarido,
-              filteredNames,
-              scoped: Boolean(selectedName || filterTerritorio || semiRegionOn)
+              selectedName: coordGeometry ? null : selectedName,
+              filterTerritorio: coordGeometry ? '' : filterTerritorio,
+              filterSemiarido: coordGeometry ? undefined : filterSemiarido,
+              filteredNames: coordGeometry ? [] : filteredNames,
+              geometry: coordGeometry,
+              scoped: Boolean(coordGeometry || selectedName || filterTerritorio || semiRegionOn)
             })
           })
         : { pocos: [], sistemas: [], truncated: { pocos: false, sistemas: false } }
@@ -1387,7 +1621,7 @@ const Widget = (props: AllWidgetProps<any>) => {
             }
           })
       }))
-      if (scoped.length > 1 && scoped.length <= 12) {
+      if (!coordGeometry && scoped.length > 1 && scoped.length <= 12) {
         sections.push({
           title: 'Municípios no recorte',
           table: {
@@ -1400,17 +1634,24 @@ const Widget = (props: AllWidgetProps<any>) => {
           }
         })
       }
+      const coordKpis = coordGeometry && coordHit
+        ? [
+            { label: 'Raio no terreno', value: `${coordHit.radiusKm} km` },
+            { label: 'Poços no raio', value: formatPopulation(assetLists.pocos.length) },
+            { label: 'Sistemas no raio', value: formatPopulation(assetLists.sistemas.length) }
+          ]
+        : [
+            { label: 'Municípios no recorte', value: formatPopulation(scoped.length) },
+            { label: 'População no recorte', value: formatPopulation(population) },
+            { label: 'Municípios no semiárido', value: formatPopulation(semiCount) }
+          ]
       await downloadRelatorioPdf({
         title: 'Relatório de infraestrutura hídrica',
         theme: 'infra',
         scope: scopeLabel,
         source: 'Inventário de ativos · web map de infraestrutura',
         fileName: `relatorio-infraestrutura-${slugRelatorio(scopeLabel)}.pdf`,
-        kpis: [
-          { label: 'Municípios no recorte', value: formatPopulation(scoped.length) },
-          { label: 'População no recorte', value: formatPopulation(population) },
-          { label: 'Municípios no semiárido', value: formatPopulation(semiCount) }
-        ],
+        kpis: coordKpis,
         mapCaption: scopeLabel,
         mapLegendTitle: 'Legenda do mapa',
         mapLegendNote: 'Símbolos e classes visíveis no recorte atual.',
@@ -1448,7 +1689,9 @@ const Widget = (props: AllWidgetProps<any>) => {
     filterTerritorio,
     filterSemiarido,
     filteredNames,
-    semiRegionOn
+    semiRegionOn,
+    hasCoordZone,
+    coordHit
   ])
 
   return (
@@ -1494,6 +1737,7 @@ const Widget = (props: AllWidgetProps<any>) => {
                           className={view.id === active?.id ? 'is-active' : ''}
                           onClick={() => {
                             setChartView((prev) => ({ ...prev, [chart.id]: view.id }))
+                            setChartFilter((prev) => (prev?.chartId === chart.id ? null : prev))
                           }}
                         >
                           {view.subtitle}
@@ -1514,9 +1758,41 @@ const Widget = (props: AllWidgetProps<any>) => {
                         items={active.items}
                         layout={active.layout || 'pie'}
                         preserveOrder={active.id === 'porte'}
+                        selectedLabel={chartFilter?.chartId === chart.id && chartFilter.viewId === active.id ? chartFilter.label : null}
+                        onSliceSelect={(slice) => {
+                          const same = Boolean(
+                            chartFilter
+                            && chartFilter.chartId === chart.id
+                            && chartFilter.viewId === active.id
+                            && chartFilter.label === slice.label
+                          )
+                          const next = same
+                            ? null
+                            : {
+                              chartId: chart.id,
+                              viewId: active.id,
+                              label: slice.label,
+                              parts: slice.parts?.length
+                                ? slice.parts.map((part) => ({ label: part.label }))
+                                : undefined
+                            }
+                          setChartFilter(next)
+                          if (next) {
+                            setListTab('ativos')
+                            setPage(0)
+                          }
+                        }}
                       />
                       )}
               </div>
+              {chart.source
+                ? (
+                  <p className="infra-chart__source">
+                    <span aria-hidden="true" />
+                    <span>Fonte: <strong>{chart.source}</strong></span>
+                  </p>
+                  )
+                : null}
             </article>
           )
         })}
@@ -1527,7 +1803,7 @@ const Widget = (props: AllWidgetProps<any>) => {
             <p className="infra-mun__eyebrow">Recorte territorial</p>
             <div className="infra-mun__title-row">
               <h2 className="infra-mun__title">
-                {listTab === 'ativos' ? 'Ativos' : listTab === 'setores' ? 'Aglomerado' : 'Municípios'}
+                {listTab === 'ativos' ? 'Infraestrutura' : listTab === 'setores' ? 'Aglomerado' : 'Municípios'}
               </h2>
               {listTab === 'setores'
                 ? (
@@ -1603,7 +1879,7 @@ const Widget = (props: AllWidgetProps<any>) => {
                 setPage(0)
               }}
             >
-              Ativos
+              Infraestrutura
             </button>
             <button
               type="button"
@@ -1673,14 +1949,72 @@ const Widget = (props: AllWidgetProps<any>) => {
                       }}
                     />
                   </label>
+                  <label className="infra-mun__coord">
+                    Buscar por coordenada geográfica
+                    <span className="infra-mun__coord-row">
+                      <input
+                        type="search"
+                        value={coordQuery}
+                        placeholder="Cole DMS ou decimal"
+                        onPaste={(event) => {
+                          const text = event.clipboardData?.getData('text') || ''
+                          const compact = text.replace(/\s+/g, ' ').trim()
+                          setCoordQuery(compact)
+                          setCoordError('')
+                          void goToCoordinate(text)
+                        }}
+                        onChange={(event) => {
+                          const value = event.target.value
+                          setCoordQuery(value)
+                          setCoordError('')
+                          if (!value.trim()) {
+                            coordBufferRef.current = null
+                            setCoordBufferEpoch(0)
+                            setCoordHit(null)
+                            clearCoordMarker(viewRef.current)
+                            setAtivos([])
+                            setSetores([])
+                            pinnedAtivoRef.current = null
+                            void applyInfraGeometryFilter(viewRef.current, webMapRef.current, null)
+                          }
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            void goToCoordinate()
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="infra-mun__coord-go"
+                        onClick={() => { void goToCoordinate() }}
+                      >
+                        Ir no mapa
+                      </button>
+                    </span>
+                    {coordError
+                      ? <span className="infra-mun__coord-error">{coordError}</span>
+                      : null}
+                  </label>
                   <button
                     type="button"
                     className="infra-mun__clear"
-                    disabled={!filterTerritorio && !munQuery}
+                    disabled={!filterTerritorio && !munQuery && !coordQuery && !coordHit}
                     onClick={() => {
                       setFilterTerritorio('')
                       setMunQuery('')
+                      setCoordQuery('')
+                      setCoordError('')
+                      setCoordHit(null)
+                      coordBufferRef.current = null
+                      setCoordBufferEpoch(0)
                       setPage(0)
+                      clearCoordMarker(viewRef.current)
+                      setAtivos([])
+                      setSetores([])
+                      pinnedAtivoRef.current = null
+                      void applyInfraGeometryFilter(viewRef.current, webMapRef.current, null)
                       void restoreScopeView({ territorio: '' })
                     }}
                   >
@@ -1698,6 +2032,12 @@ const Widget = (props: AllWidgetProps<any>) => {
                       value={assetType}
                       onChange={(event) => {
                         setAssetType(event.target.value as AssetType)
+                        setChartFilter((prev) => {
+                          const value = event.target.value as AssetType
+                          if (!value) return null
+                          if (prev && prev.chartId !== value) return null
+                          return prev
+                        })
                         setPage(0)
                       }}
                     >
@@ -1712,7 +2052,7 @@ const Widget = (props: AllWidgetProps<any>) => {
                     <input
                       type="search"
                       value={assetQuery}
-                      placeholder="Sistema, poço ou reservatório"
+                      placeholder="Sistema, poço ou barragem"
                       onChange={(event) => setAssetQuery(event.target.value)}
                     />
                   </label>
@@ -1829,7 +2169,7 @@ const Widget = (props: AllWidgetProps<any>) => {
                 <SetoresList
                   query={setorSearch}
                   municipality={selectedName}
-                  territory={filterTerritorio}
+                  territory={coordHit?.radiusKm ? `raio de ${coordHit.radiusKm} km` : filterTerritorio}
                   loading={setoresLoading}
                   items={setores}
                   page={page}
@@ -1845,7 +2185,7 @@ const Widget = (props: AllWidgetProps<any>) => {
                 <AtivosList
                   query={assetSearch}
                   municipality={selectedName}
-                  territory={filterTerritorio}
+                  territory={coordHit?.radiusKm ? `raio de ${coordHit.radiusKm} km` : filterTerritorio}
                   loading={ativosLoading}
                   items={ativos}
                   page={page}
@@ -1893,23 +2233,25 @@ const Widget = (props: AllWidgetProps<any>) => {
             onMouseDown={(event) => event.stopPropagation()}
             onClick={(event) => event.stopPropagation()}
           >
-            {selectedName && !munPopup.open && !selectedAtivoKey && !selectedSetorKey
+            {(coordHit && !coordHit.open && !selectedAtivoKey && !selectedSetorKey) || (selectedName && !munPopup.open && !coordHit && !selectedAtivoKey && !selectedSetorKey)
               ? (
                 <button
                   type="button"
                   className="mun-popup__expand"
-                  aria-label={`Abrir ficha de ${selectedName}`}
-                  title="Abrir ficha do município"
+                  aria-label={coordHit ? 'Abrir ficha da coordenada' : `Abrir ficha de ${selectedName}`}
+                  title={coordHit ? 'Abrir ficha da coordenada' : 'Abrir ficha do município'}
                   onPointerDown={(event) => event.stopPropagation()}
                   onMouseDown={(event) => {
                     event.stopPropagation()
                     event.preventDefault()
-                    reopenMunPopup(event)
+                    if (coordHit) setCoordHit({ ...coordHit, open: true })
+                    else reopenMunPopup(event)
                   }}
                   onClick={(event) => {
                     event.stopPropagation()
                     event.preventDefault()
-                    reopenMunPopup(event)
+                    if (coordHit) setCoordHit({ ...coordHit, open: true })
+                    else reopenMunPopup(event)
                   }}
                 >
                   <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -1981,11 +2323,60 @@ const Widget = (props: AllWidgetProps<any>) => {
               ) : null}
             </div>
             </div>
+            {coordHit?.open
+              ? (
+                <div
+                  className="mun-popup is-open"
+                  role="complementary"
+                  aria-label="Ficha da coordenada"
+                >
+                  <div className="mun-popup__card coord-popup__card">
+                    <button
+                      type="button"
+                      className="mun-popup__close"
+                      aria-label="Fechar"
+                      onClick={closeCoordPopup}
+                    >
+                      ×
+                    </button>
+                    <p className="mun-popup__kicker">Recorte por coordenada</p>
+                    <h4 className="mun-popup__title">{coordHit.label.split('  (')[0]}</h4>
+                    <dl className="mun-popup__grid">
+                      <div className="mun-popup__row">
+                        <dt className="mun-popup__label">Decimal</dt>
+                        <dd className="mun-popup__value">{coordHit.lat.toFixed(6)}, {coordHit.lon.toFixed(6)}</dd>
+                      </div>
+                      <div className="mun-popup__row">
+                        <dt className="mun-popup__label">Raio atual</dt>
+                        <dd className="mun-popup__value">{radiusDraft} km</dd>
+                      </div>
+                    </dl>
+                    <label className="infra-mun__radius">
+                      Área de busca
+                      <input
+                        type="range"
+                        min={COORD_RADIUS_MIN_KM}
+                        max={COORD_RADIUS_MAX_KM}
+                        step={1}
+                        value={radiusDraft}
+                        onChange={(event) => scheduleNearbyRadius(Number(event.target.value))}
+                      />
+                      <span className="infra-mun__radius-scale">
+                        <span>{COORD_RADIUS_MIN_KM} km</span>
+                        <span>Máximo {COORD_RADIUS_MAX_KM} km</span>
+                      </span>
+                    </label>
+                    <p className="coord-popup__note">
+                      O raio é em <strong>quilômetros reais no terreno</strong>. O círculo chega no máximo a <strong>{COORD_RADIUS_MAX_KM} km</strong> a partir deste ponto.
+                    </p>
+                  </div>
+                </div>
+                )
+              : null}
           </div>
         </div>
       </div>
       <SistemasMap folderUrl={props.context.folderUrl} />
-      <KaioChat folderUrl={props.context.folderUrl} />
     </div>
   )
 }

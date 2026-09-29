@@ -8,6 +8,7 @@ export default function MapLegend (props: {
   place: string
   loading: boolean
   groups: AssetLegendGroup[]
+  totalNoun?: string
 }) {
   const [open, setOpen] = useState(false)
   const total = props.groups.reduce((sum, group) => (
@@ -15,6 +16,7 @@ export default function MapLegend (props: {
       ? sum
       : sum + group.items.reduce((acc, item) => acc + item.count, 0)
   ), 0)
+  const totalNoun = props.totalNoun || 'ativos'
 
   return (
     <aside className={`infra-map-legend${open ? ' is-open' : ''}`}>
@@ -23,11 +25,16 @@ export default function MapLegend (props: {
         className="infra-map-legend__toggle"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
+        aria-label={open ? 'Fechar legenda' : 'Abrir legenda'}
       >
-        <span>
-          <small>Legenda</small>
-          <strong>{props.place}</strong>
-        </span>
+        {open
+          ? (
+            <span>
+              <small>Legenda</small>
+              <strong>{props.place}</strong>
+            </span>
+            )
+          : <strong>Legenda</strong>}
         <em>{open ? '−' : '+'}</em>
       </button>
       {open
@@ -57,7 +64,7 @@ export default function MapLegend (props: {
                   </section>
                   ))}
             {!props.loading && total
-              ? <p className="infra-map-legend__total">{total} ativos</p>
+              ? <p className="infra-map-legend__total">{total} {totalNoun}</p>
               : null}
           </div>
           )

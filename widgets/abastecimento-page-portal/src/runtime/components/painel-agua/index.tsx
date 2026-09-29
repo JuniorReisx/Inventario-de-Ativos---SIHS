@@ -248,7 +248,6 @@ const PainelAgua = ({ folderUrl }: { folderUrl: string }) => {
                               <thead>
                                 <tr>
                                   <th>Código do aglomerado</th>
-                                  <th>Nome do aglomerado</th>
                                   <th>Tipo do setor</th>
                                   <th>Situação</th>
                                   <th>População</th>
