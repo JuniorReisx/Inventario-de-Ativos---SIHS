@@ -1,4 +1,4 @@
-import { resolveField } from './map'
+import { agglomeradoDisplayName, resolveField } from './map'
 
 function num (value: any): number {
   const n = Number(String(value ?? '').replace(',', '.'))
@@ -241,6 +241,7 @@ export async function loadSetoresUrbanoRural (
 export type SetorCensitarioRow = {
   codigo: string
   codAglom: string
+  nomeAglom: string
   oid: number
   situacao: string
   tipo: string
@@ -264,32 +265,6 @@ function decodeField (layer: any, fieldName: string, raw: any): string {
     if (match?.name) return String(match.name).trim()
   } catch (_) {}
   return text(raw)
-}
-
-function attrOf (attrs: Record<string, any>, fieldName: string): any {
-  if (!attrs || !fieldName) return undefined
-  if (Object.prototype.hasOwnProperty.call(attrs, fieldName)) return attrs[fieldName]
-  const hit = Object.keys(attrs).find((key) => key.toLowerCase() === fieldName.toLowerCase())
-  return hit ? attrs[hit] : undefined
-}
-
-function pickAglomLabel (
-  layer: any,
-  attrs: Record<string, any>,
-  aglomField: string,
-  aglomCodField: string
-): string {
-  const decodedCode = decodeField(layer, aglomCodField, attrOf(attrs, aglomCodField))
-  if (decodedCode && decodedCode !== '0') return decodedCode
-  const decodedName = decodeField(layer, aglomField, attrOf(attrs, aglomField))
-    || pickAttr(attrs, ['nm_aglom', 'nome_aglomerado', 'aglomerado', 'nome_do_aglomerado'])
-  if (decodedName) return decodedName
-  const rawCode = attrOf(attrs, aglomCodField)
-  if (rawCode === 0 || rawCode === '0' || rawCode == null || String(rawCode).trim() === '') {
-    return 'Não especial'
-  }
-  const asText = codeText(rawCode)
-  return asText || 'Não especial'
 }
 
 function pickAttr (attrs: Record<string, any>, candidates: string[]): string {
@@ -415,7 +390,8 @@ export async function querySetoresDoMunicipio (
       const setorCode = pickBestCode(layer, attrs, setorField)
       rows.push({
         codigo: setorCode || '—',
-        codAglom: setorCode || pickAglomLabel(layer, attrs, aglomField, aglomCodField),
+        codAglom: setorCode || '—',
+        nomeAglom: agglomeradoDisplayName(layer, attrs),
         oid: Number(attrs[oidField] ?? attrs.OBJECTID ?? attrs.objectid) || 0,
         situacao,
         tipo,

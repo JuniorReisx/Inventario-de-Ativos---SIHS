@@ -247,7 +247,8 @@ const PainelAgua = ({ folderUrl }: { folderUrl: string }) => {
                             <table className="data-table" id="aglomeradosTable">
                               <thead>
                                 <tr>
-                                  <th>Código do aglomerado</th>
+                                  <th>Código</th>
+                                  <th>Aglomerado</th>
                                   <th>Tipo do setor</th>
                                   <th>Situação</th>
                                   <th>População</th>

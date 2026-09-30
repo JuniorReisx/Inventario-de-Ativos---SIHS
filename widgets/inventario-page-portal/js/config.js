@@ -22,12 +22,12 @@ export const OAUTH_APP_ID = "";
 export const HEADER_INDICATORS = [
   {
     id: "territorios",
-    label: "Território de\nIdentidades",
+    label: "Territórios de\nidentidade",
     layerTitle: "Territórios de identidade",
     statisticType: "count",
     icon: "territorios",
     popup: {
-      title: "Territórios de Identidade",
+      title: "Territórios de identidade",
       mode: "list",
       field: "nom_ti",
       orderByFields: ["cod_tii ASC"],

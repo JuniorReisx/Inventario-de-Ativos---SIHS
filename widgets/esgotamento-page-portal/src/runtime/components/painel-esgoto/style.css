@@ -2235,6 +2235,15 @@
   color: var(--primary);
 }
 
+.esgo-painel #aglomeradosTable td.nm-aglom{
+  min-width: 10rem;
+  max-width: 18rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-weight: 600;
+}
+
 .esgo-painel .data-table td.num{
   font-variant-numeric: tabular-nums;
   font-weight: 700;

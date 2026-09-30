@@ -84,12 +84,12 @@ export interface PopulationChartConfig {
 export const HEADER_INDICATORS: IndicatorDefinition[] = [
   {
     id: 'territorios',
-    label: 'Território de\nIdentidades',
+    label: 'Territórios de\nidentidade',
     layerTitle: 'Territórios de Identidade',
     statisticType: 'count',
     icon: 'territorios',
     popup: {
-      title: 'Territórios de Identidade',
+      title: 'Territórios de identidade',
       mode: 'list',
       field: 'nm_ti',
       orderByFields: ['cd_ti ASC'],

@@ -1,3 +1,5 @@
+> Este arquivo descreve o protótipo antigo em HTML/JS (`js/`, `index.html`), que ficou dentro do widget. A aplicação em uso é o Experience Builder. O guia do projeto está em [`docs/README.md`](../../../../docs/README.md), na raiz do repositório.
+
 # SIHS — Tela Inicial (ArcGIS Enterprise + Web Map)
 
 Aplicação web em **HTML, CSS e JavaScript puro (ES Modules)** que consome um **Web Map existente** do **ArcGIS Enterprise**, respeitando as camadas já configuradas no Portal, e alimenta **cards/indicadores** com consultas reais (`queryFeatures` / `outStatistics`).

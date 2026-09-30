@@ -1106,9 +1106,11 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
       const tipo = String(r.tipo || '—').replace(/</g, '&lt;');
       const situacao = String(r.situacao || '—').replace(/</g, '&lt;');
       const codAglom = shown.replace(/</g, '&lt;');
+      const nomeAglom = String(r.nomeAglom || '—').replace(/</g, '&lt;');
       return `
       <tr class="aglomerado-row" data-codigo="${codigo}" data-oid="${oid}" tabindex="0" role="button" title="Selecionar no mapa">
         <td class="cod-aglom">${codAglom}</td>
+        <td class="nm-aglom">${nomeAglom}</td>
         <td>${tipo}</td>
         <td>${situacao}</td>
         <td class="num">${fmt(r.populacao)}</td>
@@ -1133,10 +1135,11 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
       if(tipo && String(row.tipo || '') !== tipo) return false;
       if(!query) return true;
       const tipoTxt = normalizeSearch(row.tipo);
+      const nomeAglom = normalizeSearch(row.nomeAglom);
       const codigo = normalizeSearch(formatCodigo(row.codAglom));
       const codigoRaw = normalizeSearch(row.codigo);
       const digits = String(row.codigo || '').replace(/\D/g, '');
-      if(tipoTxt.includes(query) || codigo.includes(query) || codigoRaw.includes(query)) return true;
+      if(tipoTxt.includes(query) || nomeAglom.includes(query) || codigo.includes(query) || codigoRaw.includes(query)) return true;
       if(queryDigits && digits.includes(queryDigits)) return true;
       return false;
     });
@@ -1179,7 +1182,7 @@ export function initPainelAgua (root, GEO, PTS_DATA, mapApi, SETORES) {
     const table = qs('#'+'aglomeradosTable');
     const title = qs('#'+'aglomeradosTitle');
     if(title) title.textContent = `Setores censitários — ${nm}`;
-    if(tbody) tbody.innerHTML = `<tr><td colspan="5">Carregando setores censitários…</td></tr>`;
+    if(tbody) tbody.innerHTML = `<tr><td colspan="6">Carregando setores censitários…</td></tr>`;
     if(table) table.style.display = '';
     if(empty) empty.style.display = 'none';
     resetSetoresFilters();

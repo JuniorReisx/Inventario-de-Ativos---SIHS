@@ -218,10 +218,50 @@ function pickAttrValue (attrs: Record<string, any> | null | undefined, candidate
   return null
 }
 
+const AGLOM_NAME_FIELDS = ['nm_aglom', 'nome_aglomerado', 'aglomerado', 'nome_do_aglomerado', 'nm_aglo', 'nome_aglom']
+const AGLOM_CODE_FIELDS = ['cd_aglom', 'cd_aglomerado', 'codigo_aglomerado', 'codigo_do_aglomerado', 'cod_aglom', 'cd_aglo']
+
+function decodeCodedName (layer: any, fieldName: string, raw: any): string {
+  if (!fieldName || raw == null || String(raw).trim() === '') return ''
+  try {
+    const wanted = normalizeText(fieldName)
+    const field = (layer?.fields || []).find((item: any) => (
+      normalizeText(item?.name || '') === wanted || normalizeText(item?.alias || '') === wanted
+    ))
+    const coded = field?.domain?.codedValues as Array<{ code: any, name: string }> | undefined
+    const match = coded?.find((item) => String(item.code) === String(raw))
+    if (match?.name) return String(match.name).trim()
+  } catch (_) {}
+  return ''
+}
+
+export function agglomeradoDisplayName (layer: any, attrs: Record<string, any> | null | undefined): string {
+  const nameField = resolveField(layer, ...AGLOM_NAME_FIELDS)
+  const codeField = resolveField(layer, ...AGLOM_CODE_FIELDS)
+  const nameRaw = pickAttrValue(attrs, nameField ? [nameField, ...AGLOM_NAME_FIELDS] : AGLOM_NAME_FIELDS)
+  const fromName = decodeCodedName(layer, nameField, nameRaw)
+  if (fromName) return fromName
+  const nameText = nameRaw != null ? String(nameRaw).trim() : ''
+  if (nameText && !/^\d+$/.test(nameText)) return nameText
+  const codeRaw = pickAttrValue(attrs, codeField ? [codeField, ...AGLOM_CODE_FIELDS] : AGLOM_CODE_FIELDS)
+  const fromCode = decodeCodedName(layer, codeField, codeRaw)
+  if (fromCode && fromCode !== '0') return fromCode
+  for (const field of layer?.fields || []) {
+    const key = normalizeText(field?.name || '')
+    if (!key.includes('aglom')) continue
+    const raw = pickAttrValue(attrs, [field.name])
+    const decoded = decodeCodedName(layer, field.name, raw)
+    if (decoded && decoded !== '0' && !/^\d+$/.test(decoded)) return decoded
+    const text = raw != null ? String(raw).trim() : ''
+    if (text && !/^\d+$/.test(text) && !key.startsWith('cd')) return text
+  }
+  return nameText || '—'
+}
+
 function formatSetorValue (layer: any, fieldHint: string, raw: any): string {
   if (raw == null || raw === '') return '—'
   const hint = normalizeText(fieldHint)
-  const asCode = hint.includes('setor') || hint.includes('aglom') || hint.includes('codigo') || hint.startsWith('cd')
+  const asCode = hint.startsWith('cd') || hint.includes('codigo')
   if (!asCode) {
     try {
       const field = (layer?.fields || []).find((item: any) => normalizeText(item?.name || '') === normalizeText(fieldHint))
@@ -252,8 +292,8 @@ function setorPopupSpecs (theme: 'agua' | 'esgoto'): SetorPopupSpec[] {
     { label: 'Situação', candidates: ['situacao', 'nm_sit', 'sit_setor', 'situacao_do_setor_censitario'] },
     { label: 'Tipo de setor', candidates: ['nm_tipo', 'tipo_sc', 'tipo_setor', 'tipo'] },
     { label: 'Distrito', candidates: ['nm_dist', 'nm_distrito', 'distrito'] },
-    { label: 'Aglomerado', candidates: ['nm_aglom', 'nome_aglomerado', 'aglomerado'] },
-    { label: 'Código', candidates: ['cd_setor', 'codigo_do_setor', 'cd_aglom', 'cd_aglomerado', 'codigo_aglomerado', 'codigo_do_aglomerado'] },
+    { label: 'Aglomerado', candidates: AGLOM_NAME_FIELDS },
+    { label: 'Código', candidates: ['cd_setor', 'codigo_do_setor'] },
     { label: 'População', candidates: ['v0001', 'populacao', 'pop'] },
     { label: 'Domicílios', candidates: ['v0002', 'domicilios', 'total_domicilios'] }
   ]
@@ -1112,6 +1152,9 @@ export function createMapApi (view: any, layer: any, options: {
     const munName = pickAttrValue(attrs, ['nm_mun', 'municipio', 'nome_do_municipio'])
     const theme = options.setoresTheme || 'agua'
     const rows = setorPopupSpecs(theme).flatMap((spec) => {
+      if (spec.label === 'Aglomerado') {
+        return [{ label: spec.label, value: agglomeradoDisplayName(sl, attrs) }]
+      }
       const raw = pickAttrValue(attrs, spec.candidates)
       if (raw == null) return []
       return [{ label: spec.label, value: formatSetorValue(sl, spec.candidates[0], raw) }]
