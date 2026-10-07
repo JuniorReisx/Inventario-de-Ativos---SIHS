@@ -37,19 +37,53 @@ export async function countFeatures (
     params.spatialRelationship = 'intersects'
   }
 
+  const attempts: Array<() => Promise<number>> = []
+
   if (typeof layer.queryFeatureCount === 'function') {
-    return layer.queryFeatureCount(params)
+    attempts.push(async () => Number(await layer.queryFeatureCount(params)))
   }
 
-  const result = await queryStatistics(layer, {
-    where,
-    geometry,
-    statisticType: 'count',
-    onStatisticField: resolveCountField(layer),
-    outStatisticFieldName: 'total'
+  attempts.push(async () => {
+    const result = await queryStatistics(layer, {
+      where,
+      geometry,
+      statisticType: 'count',
+      onStatisticField: resolveCountField(layer),
+      outStatisticFieldName: 'total'
+    })
+    return Number(result?.total ?? 0)
   })
 
-  return Number(result?.total ?? 0)
+  if (layer?.url && !geometry) {
+    attempts.push(async () => queryRestCount(layer.url, where))
+  }
+
+  attempts.push(async () => {
+    const query = typeof layer.createQuery === 'function' ? layer.createQuery() : params
+    query.where = where
+    query.returnGeometry = false
+    query.returnCountOnly = true
+    if (geometry) {
+      query.geometry = geometry
+      query.spatialRelationship = 'intersects'
+    }
+    const result = await layer.queryFeatures(query)
+    const counted = Number(result?.count)
+    if (Number.isFinite(counted) && counted >= 0) return counted
+    return Number(result?.features?.length ?? 0)
+  })
+
+  let lastError: unknown = null
+  for (const run of attempts) {
+    try {
+      const value = await run()
+      if (Number.isFinite(value) && value >= 0) return value
+    } catch (error) {
+      lastError = error
+    }
+  }
+
+  throw lastError || new Error('Falha na contagem da camada')
 }
 
 const SEMIARIDO_MUN_COUNT_FIELDS = [
@@ -212,7 +246,12 @@ export async function queryRestCount (layerOrTableUrl: string, where = '1=1'): P
   url.searchParams.set('returnCountOnly', 'true')
   url.searchParams.set('f', 'json')
 
-  const response = await fetch(url.toString(), { credentials: 'include' })
+  let response: Response
+  try {
+    response = await fetch(url.toString(), { credentials: 'include' })
+  } catch {
+    response = await fetch(url.toString(), { credentials: 'omit' })
+  }
   if (!response.ok) {
     throw new Error(`Falha na contagem REST (${response.status})`)
   }
@@ -222,7 +261,11 @@ export async function queryRestCount (layerOrTableUrl: string, where = '1=1'): P
     throw new Error(data.error.message || 'Erro na contagem REST')
   }
 
-  return Number(data.count ?? 0)
+  const counted = Number(data.count ?? data.Count)
+  if (!Number.isFinite(counted) || counted < 0) {
+    throw new Error('Contagem REST sem valor')
+  }
+  return counted
 }
 
 export async function queryFieldValues (

@@ -232,7 +232,14 @@ async function resolveDualCount (
   const geolocalized = await countFeatures(layer, where)
 
   const extraCounts = await Promise.all(
-    (dual.additionalCountUrls || []).map((url) => queryRestCount(url, '1=1'))
+    (dual.additionalCountUrls || []).map(async (url) => {
+      try {
+        return await queryRestCount(url, '1=1')
+      } catch (error) {
+        console.warn('[sihs-dash] contagem extra de sistemas indisponível:', url, error)
+        return 0
+      }
+    })
   )
   const extraTotal = extraCounts.reduce((sum, n) => sum + (Number(n) || 0), 0)
   const total = geolocalized + extraTotal
